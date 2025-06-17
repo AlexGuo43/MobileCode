@@ -102,7 +102,10 @@ export function SyntaxHighlighter({ code, language }: SyntaxHighlighterProps) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 16,
+    paddingTop: 16,
+    paddingRight: 16,
+    paddingBottom: 16,
+    paddingLeft: 8,
   },
   code: {
     fontSize: 14,

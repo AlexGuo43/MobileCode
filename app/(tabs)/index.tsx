@@ -231,6 +231,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2C2C2E',
     paddingTop: 16,
     paddingHorizontal: 8,
+    flexGrow: 0,
   },
   lineNumber: {
     color: '#8E8E93',

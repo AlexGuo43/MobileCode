@@ -227,10 +227,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
   },
   lineNumbers: {
-    width: 50,
+    width: 40,
     backgroundColor: '#2C2C2E',
     paddingTop: 16,
-    paddingHorizontal: 8,
+    paddingRight: 4,
+    paddingLeft: 0,
   },
   lineNumber: {
     color: '#8E8E93',
@@ -252,7 +253,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingRight: 16,
     paddingBottom: 16,
-    paddingLeft: 8,
+    paddingLeft: 4,
     backgroundColor: 'transparent',
     position: 'absolute',
     top: 0,

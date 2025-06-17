@@ -105,7 +105,7 @@ const styles = StyleSheet.create({
     paddingTop: 16,
     paddingRight: 16,
     paddingBottom: 16,
-    paddingLeft: 8,
+    paddingLeft: 4,
   },
   code: {
     fontSize: 14,

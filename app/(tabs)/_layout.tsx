@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Code, Terminal, FileText, Settings } from 'lucide-react-native';
+import { Code, Terminal, FileText, Settings, Calendar } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -28,6 +28,15 @@ export default function TabLayout() {
           title: 'Files',
           tabBarIcon: ({ size, color }) => (
             <FileText size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="daily"
+        options={{
+          title: 'Daily',
+          tabBarIcon: ({ size, color }) => (
+            <Calendar size={size} color={color} />
           ),
         }}
       />

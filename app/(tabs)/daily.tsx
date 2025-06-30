@@ -55,6 +55,7 @@ export default function DailyChallengeScreen() {
   const [qDifficulty, setQDifficulty] = useState('');
   const [activeTab, setActiveTab] = useState<'problem' | 'solution'>('problem');
   const [solution, setSolution] = useState('');
+  const [slug, setSlug] = useState('');
 
   useEffect(() => {
     async function loadChallenge() {
@@ -68,6 +69,7 @@ export default function DailyChallengeScreen() {
         setDate(data.date);
         setQDifficulty(data.question.difficulty);
         setDescription(data.question.content);
+        setSlug(data.question.titleSlug);
         const resp2 = await fetch(`https://leetcode-api-tau-eight.vercel.app/problem/${data.question.titleSlug}/solutions`);
         const data2 = await resp2.json();
         const resp3 = await fetch(`https://leetcode-api-tau-eight.vercel.app/solution/topic/${data2.edges[1].node.topicId}`);
@@ -86,8 +88,31 @@ export default function DailyChallengeScreen() {
     loadChallenge();
   }, []);
 
-  const openEditor = () => {
-    router.push('/');
+  const openEditor = async () => {
+    try {
+      const resp = await fetch('https://leetcode.com/graphql', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          operationName: 'questionEditorData',
+          variables: { titleSlug: slug },
+          query: `
+            query questionEditorData($titleSlug: String!) {
+              question(titleSlug: $titleSlug) {
+                codeDefinition
+              }
+            }
+          `,
+        }),
+      });
+      const data = await resp.json();
+      const codeDef = data.data.question.codeDefinition;
+      router.push({ pathname: '/', params: { codeDefinition: encodeURIComponent(codeDef) } });
+    } catch (e) {
+      router.push('/');
+    }
   };
 
   return (

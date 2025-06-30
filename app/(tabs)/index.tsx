@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,6 +18,7 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { useLocalSearchParams } from 'expo-router';
 import { Play, Save, Undo, Redo, Plus, ChevronDown } from 'lucide-react-native';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
@@ -26,6 +27,7 @@ import { TerminalPanel } from '@/components/TerminalPanel';
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function EditorScreen() {
+  const params = useLocalSearchParams<{ codeDefinition?: string }>();
   const [code, setCode] = useState(`# Welcome to Mobile Code Editor
 def fibonacci(n):
     if n <= 1:
@@ -43,6 +45,23 @@ for i in range(10):
   
   const terminalOffset = useSharedValue(screenHeight);
   const editorRef = useRef<TextInput>(null);
+
+  useEffect(() => {
+    if (params.codeDefinition) {
+      try {
+        const defs = JSON.parse(decodeURIComponent(String(params.codeDefinition)));
+        const py = defs.find((d: any) =>
+          d.value && String(d.value).toLowerCase().includes('python')
+        );
+        if (py && py.defaultCode) {
+          setCode(py.defaultCode);
+          setActiveFile('main.py');
+        }
+      } catch {
+        // ignore parsing errors
+      }
+    }
+  }, [params.codeDefinition]);
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {

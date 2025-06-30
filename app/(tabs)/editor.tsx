@@ -27,7 +27,7 @@ import { TerminalPanel } from '@/components/TerminalPanel';
 
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
-const CHAR_WIDTH = 8.4; // approximate width of a character
+const CHAR_WIDTH = 8.4;
 
 export default function EditorScreen() {
   const { slug } = useLocalSearchParams();
@@ -190,6 +190,11 @@ export default function EditorScreen() {
   };
 
   const cursor = getCursorCoords();
+  const maxLineLength = Math.max(...code.split('\n').map((line) => line.length));
+  const contentWidth = Math.max(
+    maxLineLength * CHAR_WIDTH + 48,
+    Dimensions.get('window').width - 50
+  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -258,28 +263,29 @@ export default function EditorScreen() {
                   </Text>
                 ))}
               </ScrollView>
-              
-              <View style={styles.codeContainer}>
-                <SyntaxHighlighter code={code} language={"python"} />
-                <View style={[styles.cursor, { left: cursor.left, top: cursor.top }]} />
-                <TextInput
-                  ref={editorRef}
-                  style={styles.codeInput}
-                  value={code}
-                  onChangeText={setCode}
-                  onSelectionChange={(event) => setCursorPosition(event.nativeEvent.selection.start)}
-                  multiline
-                  textAlignVertical="top"
-                  selectionColor="#007AFF"
-                  placeholderTextColor="#8E8E93"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  spellCheck={false}
-                  keyboardType="ascii-capable"
-                  blurOnSubmit={false}
-                  returnKeyType="default"
-                />
-              </View>
+              <ScrollView horizontal style={styles.codeScroll} bounces={false} showsHorizontalScrollIndicator={false}>
+                <View style={[styles.codeContainer, { width: contentWidth }]}>
+                  <SyntaxHighlighter code={code} language={"python"} />
+                  <View style={[styles.cursor, { left: cursor.left, top: cursor.top }]} />
+                  <TextInput
+                    ref={editorRef}
+                    style={[styles.codeInput, { width: contentWidth }]}
+                    value={code}
+                    onChangeText={setCode}
+                    onSelectionChange={(event) => setCursorPosition(event.nativeEvent.selection.start)}
+                    multiline
+                    textAlignVertical="top"
+                    selectionColor="#007AFF"
+                    placeholderTextColor="#8E8E93"
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    spellCheck={false}
+                    keyboardType="ascii-capable"
+                    blurOnSubmit={false}
+                    returnKeyType="default"
+                  />
+                </View>
+              </ScrollView>
             </View>
 
             {/* Code Keyboard */}
@@ -375,12 +381,13 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'right',
   },
-  codeContainer: {
+  codeScroll: {
     flex: 1,
+  },
+  codeContainer: {
     position: 'relative',
   },
   codeInput: {
-    flex: 1,
     color: 'transparent',
     fontSize: 14,
     fontFamily: 'FiraCode-Regular',

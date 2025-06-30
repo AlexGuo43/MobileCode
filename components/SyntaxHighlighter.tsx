@@ -108,10 +108,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontFamily: 'FiraCode-Regular',
     lineHeight: 20,
+    // prevent text wrapping for long lines
+    // @ts-ignore -- whiteSpace is for web only
+    whiteSpace: 'pre',
   },
   line: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
+    // prevent automatic wrapping within lines
+    // @ts-ignore -- whiteSpace is for web only
+    whiteSpace: 'pre',
   },
   token: {
     fontSize: 14,

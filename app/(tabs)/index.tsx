@@ -18,7 +18,8 @@ import Animated, {
   runOnJS,
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
-import { Play, Save, Undo, Redo, Plus, ChevronDown } from 'lucide-react-native';
+import { Play, Save, Undo, Redo, Plus, ChevronDown, ClipboardCopy } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
@@ -111,6 +112,12 @@ for i in range(10):
     }, 100);
   };
 
+  const copyAllText = async () => {
+    try {
+      await Clipboard.setStringAsync(code);
+    } catch {}
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
@@ -133,6 +140,9 @@ for i in range(10):
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
                   <Undo size={16} color="#007AFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton} onPress={copyAllText}>
+                  <ClipboardCopy size={16} color="#007AFF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -158,6 +168,7 @@ for i in range(10):
                   multiline
                   textAlignVertical="top"
                   selectionColor="#007AFF"
+                  cursorColor="#007AFF"
                   placeholderTextColor="#8E8E93"
                   autoCapitalize="none"
                   autoCorrect={false}

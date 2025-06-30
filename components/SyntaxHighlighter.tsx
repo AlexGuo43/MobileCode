@@ -111,7 +111,7 @@ const styles = StyleSheet.create({
   },
   line: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   token: {
     fontSize: 14,

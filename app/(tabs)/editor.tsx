@@ -27,8 +27,7 @@ import { TerminalPanel } from '@/components/TerminalPanel';
 
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
-// Slightly overestimate character width to avoid wrapping on long lines
-const CHAR_WIDTH = 9.5;
+const CHAR_WIDTH = 8.4;
 
 export default function EditorScreen() {
   const { slug } = useLocalSearchParams();

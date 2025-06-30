@@ -141,17 +141,25 @@ export default function EditorScreen() {
   }));
 
   const insertCode = (text: string) => {
+    let insertText = text;
+    if (text === '\n') {
+      const beforeCursor = code.substring(0, cursorPosition);
+      const currentLine = beforeCursor.split('\n').pop() || '';
+      const baseIndent = currentLine.match(/^\s+/)?.[0] || '';
+      insertText = '\n' + baseIndent;
+    }
+
     const beforeCursor = code.substring(0, cursorPosition);
     const afterCursor = code.substring(cursorPosition);
-    const newCode = beforeCursor + text + afterCursor;
+    const newCode = beforeCursor + insertText + afterCursor;
     setCode(newCode);
-    setCursorPosition(cursorPosition + text.length);
+    setCursorPosition(cursorPosition + insertText.length);
 
     // Focus editor and set cursor position
     setTimeout(() => {
       if (editorRef.current) {
         editorRef.current.focus();
-        const start = cursorPosition + text.length;
+        const start = cursorPosition + insertText.length;
         const end = start;
         // For native platforms use setNativeProps, for web fall back to DOM APIs
         // eslint-disable-next-line @typescript-eslint/no-explicit-any

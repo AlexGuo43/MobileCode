@@ -143,14 +143,21 @@ export default function EditorScreen() {
     const newCode = beforeCursor + text + afterCursor;
     setCode(newCode);
     setCursorPosition(cursorPosition + text.length);
-    
+
     // Focus editor and set cursor position
     setTimeout(() => {
       if (editorRef.current) {
         editorRef.current.focus();
-        editorRef.current.setNativeProps({
-          selection: { start: cursorPosition + text.length, end: cursorPosition + text.length }
-        });
+        const start = cursorPosition + text.length;
+        const end = start;
+        // For native platforms use setNativeProps, for web fall back to DOM APIs
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const input = editorRef.current as any;
+        if (typeof input.setNativeProps === 'function') {
+          input.setNativeProps({ selection: { start, end } });
+        } else if (typeof input.setSelectionRange === 'function') {
+          input.setSelectionRange(start, end);
+        }
       }
     }, 100);
   };

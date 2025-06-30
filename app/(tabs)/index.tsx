@@ -28,20 +28,38 @@ const { height: screenHeight } = Dimensions.get('window');
 
 export default function EditorScreen() {
   const params = useLocalSearchParams<{ codeDefinition?: string }>();
-  const [code, setCode] = useState(`# Welcome to Mobile Code Editor
-def fibonacci(n):
-    if n <= 1:
-        return n
-    return fibonacci(n-1) + fibonacci(n-2)
-
-# Generate first 10 fibonacci numbers
-for i in range(10):
-    print(f"F({i}) = {fibonacci(i)}")
-`);
+  const [code, setCode] = useState(`# Welcome to Mobile Code Editor\n`);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
-  const [activeFile, setActiveFile] = useState('main.py');
+  const [activeFile, setActiveFile] = useState("main.py");
+  const [language, setLanguage] = useState("python");
+  const [codeDefs, setCodeDefs] = useState<any[]>([]);
+  const [showLangMenu, setShowLangMenu] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const getExtension = (lang: string) => {
+    const map: Record<string, string> = {
+      cpp: "cpp",
+      java: "java",
+      python: "py",
+      python3: "py",
+      c: "c",
+      csharp: "cs",
+      javascript: "js",
+      typescript: "ts",
+      php: "php",
+      swift: "swift",
+      kotlin: "kt",
+      dart: "dart",
+      golang: "go",
+      ruby: "rb",
+      scala: "scala",
+      rust: "rs",
+      racket: "rkt",
+      erlang: "erl",
+      elixir: "ex",
+    };
+    return map[lang] || lang;
+  };
   
   const terminalOffset = useSharedValue(screenHeight);
   const editorRef = useRef<TextInput>(null);
@@ -49,20 +67,23 @@ for i in range(10):
   useEffect(() => {
     if (params.codeDefinition) {
       try {
+
         const defs = JSON.parse(decodeURIComponent(String(params.codeDefinition)));
-        const py = defs.find((d: any) =>
-          d.value && String(d.value).toLowerCase().includes('python')
-        );
-        if (py && py.defaultCode) {
-          setCode(py.defaultCode);
-          setActiveFile('main.py');
+        setCodeDefs(defs);
+        const preferred =
+          defs.find((d: any) =>
+            d.value && String(d.value).toLowerCase().includes("python")
+          ) || defs[0];
+        if (preferred && preferred.defaultCode) {
+          setCode(preferred.defaultCode);
+          setActiveFile(`main.${getExtension(preferred.value)}`);
+          setLanguage(preferred.value);
         }
       } catch {
         // ignore parsing errors
       }
     }
   }, [params.codeDefinition]);
-
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       setIsKeyboardVisible(true);
@@ -137,7 +158,16 @@ for i in range(10):
           <View style={styles.editorContainer}>
             {/* Header */}
             <View style={styles.header}>
-              <Text style={styles.fileName}>{activeFile}</Text>
+              <TouchableOpacity
+                disabled={codeDefs.length === 0}
+                style={styles.langButton}
+                onPress={() => setShowLangMenu(!showLangMenu)}
+              >
+                <Text style={styles.fileName}>{activeFile}</Text>
+                {codeDefs.length > 1 && (
+                  <ChevronDown size={16} color="#FFFFFF" />
+                )}
+              </TouchableOpacity>
               <View style={styles.headerActions}>
                 {isKeyboardVisible && (
                   <TouchableOpacity style={styles.actionButton} onPress={dismissKeyboard}>
@@ -153,10 +183,29 @@ for i in range(10):
                 <TouchableOpacity style={styles.actionButton}>
                   <Undo size={16} color="#007AFF" />
                 </TouchableOpacity>
-              </View>
             </View>
 
             {/* Code Editor */}
+            {showLangMenu && (
+              <View style={styles.langMenu}>
+                {codeDefs.map((def: any) => (
+                  <TouchableOpacity
+                    key={String(def.value)}
+                    style={styles.langMenuItem}
+                    onPress={() => {
+                      setShowLangMenu(false);
+                      if (def.defaultCode) {
+                        setCode(def.defaultCode);
+                        setActiveFile(`main.${getExtension(def.value)}`);
+                        setLanguage(def.value);
+                      }
+                    }}
+                  >
+                    <Text style={styles.langMenuText}>{def.text}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
             <View style={styles.editorWrapper}>
               <ScrollView style={styles.lineNumbers} showsVerticalScrollIndicator={false}>
                 {code.split('\n').map((_, index) => (
@@ -167,7 +216,7 @@ for i in range(10):
               </ScrollView>
               
               <View style={styles.codeContainer}>
-                <SyntaxHighlighter code={code} language="python" />
+                <SyntaxHighlighter code={code} language=language />
                 <TextInput
                   ref={editorRef}
                   style={styles.codeInput}
@@ -240,6 +289,28 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     backgroundColor: '#3C3C3E',
+  },
+  langButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  langMenu: {
+    position: "absolute",
+    top: 56,
+    left: 16,
+    backgroundColor: "#2C2C2E",
+    borderRadius: 6,
+    paddingVertical: 4,
+    zIndex: 20,
+  },
+  langMenuItem: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  langMenuText: {
+    color: "#FFFFFF",
+    fontFamily: "FiraCode-Regular",
   },
   editorWrapper: {
     flex: 1,

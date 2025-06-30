@@ -19,12 +19,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useLocalSearchParams } from 'expo-router';
-import { Play, Save, Undo, Redo, Plus, ChevronDown } from 'lucide-react-native';
+import { Play, Save, Undo, Redo, Plus, ChevronDown, Copy } from 'lucide-react-native';
+import * as Clipboard from 'expo-clipboard';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
 
 const { height: screenHeight } = Dimensions.get('window');
+const LINE_HEIGHT = 20;
+const CHAR_WIDTH = 8.4; // approximate width of a character
 
 export default function EditorScreen() {
   const { slug } = useLocalSearchParams();
@@ -155,6 +158,21 @@ export default function EditorScreen() {
     }, 100);
   };
 
+  const copyToClipboard = () => {
+    Clipboard.setStringAsync(code);
+  };
+
+  const getCursorCoords = () => {
+    const beforeCursor = code.substring(0, cursorPosition);
+    const lines = beforeCursor.split('\n');
+    const row = lines.length - 1;
+    const col = lines[lines.length - 1].length;
+    return {
+      top: 16 + row * LINE_HEIGHT,
+      left: 16 + col * CHAR_WIDTH,
+    };
+  };
+
   const runCode = () => {
     // Dismiss keyboard first, then show terminal
     dismissKeyboard();
@@ -163,6 +181,8 @@ export default function EditorScreen() {
       terminalOffset.value = withSpring(screenHeight * 0.4);
     }, 100);
   };
+
+  const cursor = getCursorCoords();
 
   return (
     <SafeAreaView style={styles.container}>
@@ -195,6 +215,9 @@ export default function EditorScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>
                   <Undo size={16} color="#007AFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton} onPress={copyToClipboard}>
+                  <Copy size={16} color="#007AFF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -231,6 +254,7 @@ export default function EditorScreen() {
               
               <View style={styles.codeContainer}>
                 <SyntaxHighlighter code={code} language={"python"} />
+                <View style={[styles.cursor, { left: cursor.left, top: cursor.top }]} />
                 <TextInput
                   ref={editorRef}
                   style={styles.codeInput}
@@ -362,6 +386,13 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 2,
+  },
+  cursor: {
+    position: 'absolute',
+    width: 2,
+    height: LINE_HEIGHT,
+    backgroundColor: '#007AFF',
+    zIndex: 3,
   },
   terminalContainer: {
     position: 'absolute',

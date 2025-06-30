@@ -27,7 +27,7 @@ import { TerminalPanel } from '@/components/TerminalPanel';
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function EditorScreen() {
-  const params = useLocalSearchParams<{ codeDefinition?: string }>();
+  const { slug } = useLocalSearchParams();
   const [code, setCode] = useState(`# Welcome to Mobile Code Editor\n`);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
   const [activeFile, setActiveFile] = useState("main.py");
@@ -37,11 +37,11 @@ export default function EditorScreen() {
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const getExtension = (lang: string) => {
+    const normalizedLang = lang === "python3" ? "python" : lang;
     const map: Record<string, string> = {
+      python: "py",
       cpp: "cpp",
       java: "java",
-      python: "py",
-      python3: "py",
       c: "c",
       csharp: "cs",
       javascript: "js",
@@ -58,32 +58,45 @@ export default function EditorScreen() {
       erlang: "erl",
       elixir: "ex",
     };
-    return map[lang] || lang;
-  };
+    return map[normalizedLang] || normalizedLang;
+  };  
   
   const terminalOffset = useSharedValue(screenHeight);
   const editorRef = useRef<TextInput>(null);
 
   useEffect(() => {
-    if (params.codeDefinition) {
+    async function loadCodeDef() {
+      if (!slug) return;
+  
       try {
-
-        const defs = JSON.parse(decodeURIComponent(String(params.codeDefinition)));
-        setCodeDefs(defs);
-        const preferred =
-          defs.find((d: any) =>
-            d.value && String(d.value).toLowerCase().includes("python")
-          ) || defs[0];
-        if (preferred && preferred.defaultCode) {
-          setCode(preferred.defaultCode);
-          setActiveFile(`main.${getExtension(preferred.value)}`);
-          setLanguage(preferred.value);
+        const resp = await fetch(`https://leetcode-api-tau-eight.vercel.app/problem/${slug}/template`);
+        const defs = await resp.json();
+        console.log("defs: ", defs)
+  
+        if (Array.isArray(defs)) {
+          setCodeDefs(defs);
+          const preferred =
+            defs.find((d: any) =>
+              d.value?.toLowerCase().includes("python3")
+            ) || defs[0];
+          if (preferred?.defaultCode) {
+            setCode(preferred.defaultCode);
+            setActiveFile(`main.${getExtension(preferred.value)}`);
+            if(preferred.value=="python3"){
+              setLanguage("python")
+            }else{
+              setLanguage(preferred.value);
+            }
+          }
         }
-      } catch {
-        // ignore parsing errors
+      } catch (err) {
+        console.error("Failed to load code definition:", err);
       }
     }
-  }, [params.codeDefinition]);
+  
+    loadCodeDef();
+  }, [slug]);  
+  
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
       setIsKeyboardVisible(true);
@@ -163,7 +176,7 @@ export default function EditorScreen() {
                 style={styles.langButton}
                 onPress={() => setShowLangMenu(!showLangMenu)}
               >
-                <Text style={styles.fileName}>{activeFile}</Text>
+                <Text style={styles.fileName}>{language}</Text>
                 {codeDefs.length > 1 && (
                   <ChevronDown size={16} color="#FFFFFF" />
                 )}
@@ -183,6 +196,7 @@ export default function EditorScreen() {
                 <TouchableOpacity style={styles.actionButton}>
                   <Undo size={16} color="#007AFF" />
                 </TouchableOpacity>
+              </View>
             </View>
 
             {/* Code Editor */}
@@ -216,7 +230,7 @@ export default function EditorScreen() {
               </ScrollView>
               
               <View style={styles.codeContainer}>
-                <SyntaxHighlighter code={code} language=language />
+                <SyntaxHighlighter code={code} language={"python"} />
                 <TextInput
                   ref={editorRef}
                   style={styles.codeInput}

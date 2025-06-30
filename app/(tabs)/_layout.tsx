@@ -14,7 +14,7 @@ export default function TabLayout() {
         },
       }}>
       <Tabs.Screen
-        name="index"
+        name="editor"
         options={{
           title: 'Editor',
           tabBarIcon: ({ size, color }) => (

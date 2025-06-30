@@ -90,28 +90,12 @@ export default function DailyChallengeScreen() {
 
   const openEditor = async () => {
     try {
-      const resp = await fetch('https://leetcode.com/graphql', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          operationName: 'questionEditorData',
-          variables: { titleSlug: slug },
-          query: `
-            query questionEditorData($titleSlug: String!) {
-              question(titleSlug: $titleSlug) {
-                codeDefinition
-              }
-            }
-          `,
-        }),
+      router.push({
+        pathname: '/(tabs)/editor',
+        params: { slug }, // pass slug as a search param
       });
-      const data = await resp.json();
-      const codeDef = data.data.question.codeDefinition;
-      router.push({ pathname: '/', params: { codeDefinition: encodeURIComponent(codeDef) } });
     } catch (e) {
-      router.push('/');
+      console.error(e);
     }
   };
 

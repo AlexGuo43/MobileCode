@@ -55,6 +55,7 @@ export default function DailyChallengeScreen() {
   const [qDifficulty, setQDifficulty] = useState('');
   const [activeTab, setActiveTab] = useState<'problem' | 'solution'>('problem');
   const [solution, setSolution] = useState('');
+  const [slug, setSlug] = useState('');
 
   useEffect(() => {
     async function loadChallenge() {
@@ -68,6 +69,7 @@ export default function DailyChallengeScreen() {
         setDate(data.date);
         setQDifficulty(data.question.difficulty);
         setDescription(data.question.content);
+        setSlug(data.question.titleSlug);
         const resp2 = await fetch(`https://leetcode-api-tau-eight.vercel.app/problem/${data.question.titleSlug}/solutions`);
         const data2 = await resp2.json();
         const resp3 = await fetch(`https://leetcode-api-tau-eight.vercel.app/solution/topic/${data2.edges[1].node.topicId}`);
@@ -86,8 +88,15 @@ export default function DailyChallengeScreen() {
     loadChallenge();
   }, []);
 
-  const openEditor = () => {
-    router.push('/');
+  const openEditor = async () => {
+    try {
+      router.push({
+        pathname: '/(tabs)/editor',
+        params: { slug }, // pass slug as a search param
+      });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
   return (

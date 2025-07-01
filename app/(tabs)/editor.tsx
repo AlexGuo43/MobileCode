@@ -142,7 +142,9 @@ export default function EditorScreen() {
 
   const insertCode = (text: string) => {
     let insertText = text;
+    
     if (text === '\n') {
+      // Handle single newline with auto-indentation (your original logic)
       const beforeCursor = code.substring(0, cursorPosition);
       const currentLine = beforeCursor.split('\n').pop() || '';
       const baseIndent = currentLine.match(/^\s+/)?.[0] || '';
@@ -150,14 +152,28 @@ export default function EditorScreen() {
       const needsExtra = /[:{]\s*$/.test(trimmed);
       const indentStep = '    ';
       insertText = '\n' + baseIndent + (needsExtra ? indentStep : '');
+    } else if (text.includes('\n')) {
+      // For multi-line insertions from buttons, preserve the exact formatting
+      // but add base indentation to subsequent lines
+      const lines = text.split('\n');
+      const beforeCursor = code.substring(0, cursorPosition);
+      const currentLineStart = beforeCursor.lastIndexOf('\n') + 1;
+      const currentLine = beforeCursor.substring(currentLineStart);
+      const baseIndent = currentLine.match(/^\s*/)?.[0] || '';
+      
+      insertText = lines.map((line, index) => {
+        if (index === 0) return line; // First line as-is
+        // For all other lines, add the base indentation
+        return baseIndent + line;
+      }).join('\n');
     }
-
+  
     const beforeCursor = code.substring(0, cursorPosition);
     const afterCursor = code.substring(cursorPosition);
     const newCode = beforeCursor + insertText + afterCursor;
     setCode(newCode);
     setCursorPosition(cursorPosition + insertText.length);
-
+  
     // Focus editor and set cursor position
     setTimeout(() => {
       if (editorRef.current) {

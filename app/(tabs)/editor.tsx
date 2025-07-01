@@ -141,17 +141,44 @@ export default function EditorScreen() {
   }));
 
   const insertCode = (text: string) => {
+    let insertText = text;
+    
+    if (text === '\n') {
+      // Handle single newline with auto-indentation (your original logic)
+      const beforeCursor = code.substring(0, cursorPosition);
+      const currentLine = beforeCursor.split('\n').pop() || '';
+      const baseIndent = currentLine.match(/^\s+/)?.[0] || '';
+      const trimmed = currentLine.trimEnd();
+      const needsExtra = /[:{]\s*$/.test(trimmed);
+      const indentStep = '    ';
+      insertText = '\n' + baseIndent + (needsExtra ? indentStep : '');
+    } else if (text.includes('\n')) {
+      // For multi-line insertions from buttons, preserve the exact formatting
+      // but add base indentation to subsequent lines
+      const lines = text.split('\n');
+      const beforeCursor = code.substring(0, cursorPosition);
+      const currentLineStart = beforeCursor.lastIndexOf('\n') + 1;
+      const currentLine = beforeCursor.substring(currentLineStart);
+      const baseIndent = currentLine.match(/^\s*/)?.[0] || '';
+      
+      insertText = lines.map((line, index) => {
+        if (index === 0) return line; // First line as-is
+        // For all other lines, add the base indentation
+        return baseIndent + line;
+      }).join('\n');
+    }
+  
     const beforeCursor = code.substring(0, cursorPosition);
     const afterCursor = code.substring(cursorPosition);
-    const newCode = beforeCursor + text + afterCursor;
+    const newCode = beforeCursor + insertText + afterCursor;
     setCode(newCode);
-    setCursorPosition(cursorPosition + text.length);
-
+    setCursorPosition(cursorPosition + insertText.length);
+  
     // Focus editor and set cursor position
     setTimeout(() => {
       if (editorRef.current) {
         editorRef.current.focus();
-        const start = cursorPosition + text.length;
+        const start = cursorPosition + insertText.length;
         const end = start;
         // For native platforms use setNativeProps, for web fall back to DOM APIs
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -163,6 +190,21 @@ export default function EditorScreen() {
         }
       }
     }, 100);
+  };
+
+  const handleTextChange = (text: string) => {
+    const before = code.substring(0, cursorPosition);
+    const after = code.substring(cursorPosition);
+    if (
+      text.length === code.length + 1 &&
+      text.startsWith(before) &&
+      text.endsWith(after) &&
+      text[cursorPosition] === '\n'
+    ) {
+      insertCode('\n');
+    } else {
+      setCode(text);
+    }
   };
 
   const copyToClipboard = () => {
@@ -271,7 +313,7 @@ export default function EditorScreen() {
                     ref={editorRef}
                     style={[styles.codeInput, { width: contentWidth }]}
                     value={code}
-                    onChangeText={setCode}
+                    onChangeText={handleTextChange}
                     onSelectionChange={(event) => setCursorPosition(event.nativeEvent.selection.start)}
                     multiline
                     textAlignVertical="top"

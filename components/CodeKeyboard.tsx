@@ -123,9 +123,6 @@ export function CodeKeyboard({ onInsert, onDeindent, onDeleteLine }: CodeKeyboar
 
       {/* Navigation Keys */}
       <View style={styles.navigationRow}>
-        <TouchableOpacity style={styles.navButton} onPress={() => onInsert('\t')}>
-          <Text style={styles.navText}>Tab</Text>
-        </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={() => onInsert('    ')}>
           <Text style={styles.navText}>Indent</Text>
         </TouchableOpacity>
@@ -137,12 +134,6 @@ export function CodeKeyboard({ onInsert, onDeindent, onDeleteLine }: CodeKeyboar
         </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={() => onInsert('\n')}>
           <Text style={styles.navText}>↵</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton}>
-          <ChevronLeft size={16} color="#FFFFFF" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton}>
-          <ChevronRight size={16} color="#FFFFFF" />
         </TouchableOpacity>
       </View>
     </View>

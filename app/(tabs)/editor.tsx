@@ -173,6 +173,21 @@ export default function EditorScreen() {
     }, 100);
   };
 
+  const handleTextChange = (text: string) => {
+    const before = code.substring(0, cursorPosition);
+    const after = code.substring(cursorPosition);
+    if (
+      text.length === code.length + 1 &&
+      text.startsWith(before) &&
+      text.endsWith(after) &&
+      text[cursorPosition] === '\n'
+    ) {
+      insertCode('\n');
+    } else {
+      setCode(text);
+    }
+  };
+
   const copyToClipboard = () => {
     Clipboard.setStringAsync(code);
   };
@@ -279,7 +294,7 @@ export default function EditorScreen() {
                     ref={editorRef}
                     style={[styles.codeInput, { width: contentWidth }]}
                     value={code}
-                    onChangeText={setCode}
+                    onChangeText={handleTextChange}
                     onSelectionChange={(event) => setCursorPosition(event.nativeEvent.selection.start)}
                     multiline
                     textAlignVertical="top"

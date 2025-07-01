@@ -23,20 +23,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="files"
-        options={{
-          title: 'Files',
-          tabBarIcon: ({ size, color }) => (
-            <FileText size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
         name="daily"
         options={{
           title: 'Daily',
           tabBarIcon: ({ size, color }) => (
             <Calendar size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="files"
+        options={{
+          title: 'Files',
+          tabBarIcon: ({ size, color }) => (
+            <FileText size={size} color={color} />
           ),
         }}
       />

@@ -146,7 +146,10 @@ export default function EditorScreen() {
       const beforeCursor = code.substring(0, cursorPosition);
       const currentLine = beforeCursor.split('\n').pop() || '';
       const baseIndent = currentLine.match(/^\s+/)?.[0] || '';
-      insertText = '\n' + baseIndent;
+      const trimmed = currentLine.trimEnd();
+      const needsExtra = /[:{]\s*$/.test(trimmed);
+      const indentStep = '    ';
+      insertText = '\n' + baseIndent + (needsExtra ? indentStep : '');
     }
 
     const beforeCursor = code.substring(0, cursorPosition);

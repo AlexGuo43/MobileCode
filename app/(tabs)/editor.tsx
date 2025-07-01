@@ -192,6 +192,31 @@ export default function EditorScreen() {
     }, 100);
   };
 
+  const deindentLine = () => {
+    const before = code.substring(0, cursorPosition);
+    const lineStart = before.lastIndexOf('\n') + 1;
+    const lineEnd = code.indexOf('\n', cursorPosition);
+    const end = lineEnd === -1 ? code.length : lineEnd;
+    const line = code.substring(lineStart, end);
+    const indentStep = '    ';
+    if (line.startsWith(indentStep)) {
+      const newLine = line.substring(indentStep.length);
+      const newCode = code.substring(0, lineStart) + newLine + code.substring(end);
+      setCode(newCode);
+      setCursorPosition(Math.max(lineStart, cursorPosition - indentStep.length));
+    }
+  };
+
+  const deleteLine = () => {
+    const before = code.substring(0, cursorPosition);
+    const lineStart = before.lastIndexOf('\n') + 1;
+    let lineEnd = code.indexOf('\n', cursorPosition);
+    if (lineEnd === -1) lineEnd = code.length; else lineEnd += 1;
+    const newCode = code.substring(0, lineStart) + code.substring(lineEnd);
+    setCode(newCode);
+    setCursorPosition(lineStart);
+  };
+
   const handleTextChange = (text: string) => {
     const before = code.substring(0, cursorPosition);
     const after = code.substring(cursorPosition);
@@ -331,7 +356,11 @@ export default function EditorScreen() {
             </View>
 
             {/* Code Keyboard */}
-            <CodeKeyboard onInsert={insertCode} />
+            <CodeKeyboard
+              onInsert={insertCode}
+              onDeindent={deindentLine}
+              onDeleteLine={deleteLine}
+            />
           </View>
         </GestureDetector>
       </TouchableWithoutFeedback>

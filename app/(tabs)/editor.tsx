@@ -19,7 +19,15 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useLocalSearchParams } from 'expo-router';
-import { Play, Save, Undo, Redo, Plus, ChevronDown, Copy } from 'lucide-react-native';
+import {
+  Play,
+  Save,
+  Undo,
+  Redo,
+  Plus,
+  ChevronDown,
+  Copy,
+} from 'lucide-react-native';
 import * as Clipboard from 'expo-clipboard';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
@@ -33,80 +41,89 @@ export default function EditorScreen() {
   const { slug } = useLocalSearchParams();
   const [code, setCode] = useState(`# Welcome to Mobile Code Editor\n`);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
-  const [activeFile, setActiveFile] = useState("main.py");
-  const [language, setLanguage] = useState("python");
+  const [activeFile, setActiveFile] = useState('main.py');
+  const [language, setLanguage] = useState('python');
   const [codeDefs, setCodeDefs] = useState<any[]>([]);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const getExtension = (lang: string) => {
-    const normalizedLang = lang === "python3" ? "python" : lang;
+    const normalizedLang = lang === 'python3' ? 'python' : lang;
     const map: Record<string, string> = {
-      python: "py",
-      cpp: "cpp",
-      java: "java",
-      c: "c",
-      csharp: "cs",
-      javascript: "js",
-      typescript: "ts",
-      php: "php",
-      swift: "swift",
-      kotlin: "kt",
-      dart: "dart",
-      golang: "go",
-      ruby: "rb",
-      scala: "scala",
-      rust: "rs",
-      racket: "rkt",
-      erlang: "erl",
-      elixir: "ex",
+      python: 'py',
+      cpp: 'cpp',
+      java: 'java',
+      c: 'c',
+      csharp: 'cs',
+      javascript: 'js',
+      typescript: 'ts',
+      php: 'php',
+      swift: 'swift',
+      kotlin: 'kt',
+      dart: 'dart',
+      golang: 'go',
+      ruby: 'rb',
+      scala: 'scala',
+      rust: 'rs',
+      racket: 'rkt',
+      erlang: 'erl',
+      elixir: 'ex',
     };
     return map[normalizedLang] || normalizedLang;
-  };  
-  
+  };
+
   const terminalOffset = useSharedValue(screenHeight);
   const editorRef = useRef<TextInput>(null);
+  const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
+  const focusFromInsert = useRef(false);
 
   useEffect(() => {
     async function loadCodeDef() {
       if (!slug) return;
-  
+
       try {
-        const resp = await fetch(`https://leetcode-api-tau-eight.vercel.app/problem/${slug}/template`);
+        const resp = await fetch(
+          `https://leetcode-api-tau-eight.vercel.app/problem/${slug}/template`,
+        );
         const defs = await resp.json();
-        console.log("defs: ", defs)
-  
+        console.log('defs: ', defs);
+
         if (Array.isArray(defs)) {
           setCodeDefs(defs);
           const preferred =
-            defs.find((d: any) =>
-              d.value?.toLowerCase().includes("python3")
-            ) || defs[0];
+            defs.find((d: any) => d.value?.toLowerCase().includes('python3')) ||
+            defs[0];
           if (preferred?.defaultCode) {
             setCode(preferred.defaultCode);
             setActiveFile(`main.${getExtension(preferred.value)}`);
-            if(preferred.value=="python3"){
-              setLanguage("python")
-            }else{
+            if (preferred.value == 'python3') {
+              setLanguage('python');
+            } else {
               setLanguage(preferred.value);
             }
           }
         }
       } catch (err) {
-        console.error("Failed to load code definition:", err);
+        console.error('Failed to load code definition:', err);
       }
     }
-  
+
     loadCodeDef();
-  }, [slug]);  
-  
+  }, [slug]);
+
   React.useEffect(() => {
-    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
-      setIsKeyboardVisible(true);
-    });
-    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
-      setIsKeyboardVisible(false);
-    });
+    const keyboardDidShowListener = Keyboard.addListener(
+      'keyboardDidShow',
+      () => {
+        setIsKeyboardVisible(true);
+      },
+    );
+    const keyboardDidHideListener = Keyboard.addListener(
+      'keyboardDidHide',
+      () => {
+        setIsKeyboardVisible(false);
+      },
+    );
 
     return () => {
       keyboardDidShowListener?.remove();
@@ -122,7 +139,9 @@ export default function EditorScreen() {
   const toggleTerminal = () => {
     const newVisibility = !isTerminalVisible;
     setIsTerminalVisible(newVisibility);
-    terminalOffset.value = withSpring(newVisibility ? screenHeight * 0.4 : screenHeight);
+    terminalOffset.value = withSpring(
+      newVisibility ? screenHeight * 0.4 : screenHeight,
+    );
     if (newVisibility) {
       dismissKeyboard();
     }
@@ -141,8 +160,10 @@ export default function EditorScreen() {
   }));
 
   const insertCode = (text: string) => {
+    setShowSystemKeyboard(false);
+    Keyboard.dismiss();
     let insertText = text;
-    
+
     if (text === '\n') {
       // Handle single newline with auto-indentation (your original logic)
       const beforeCursor = code.substring(0, cursorPosition);
@@ -160,24 +181,28 @@ export default function EditorScreen() {
       const currentLineStart = beforeCursor.lastIndexOf('\n') + 1;
       const currentLine = beforeCursor.substring(currentLineStart);
       const baseIndent = currentLine.match(/^\s*/)?.[0] || '';
-      
-      insertText = lines.map((line, index) => {
-        if (index === 0) return line; // First line as-is
-        // For all other lines, add the base indentation
-        return baseIndent + line;
-      }).join('\n');
+
+      insertText = lines
+        .map((line, index) => {
+          if (index === 0) return line; // First line as-is
+          // For all other lines, add the base indentation
+          return baseIndent + line;
+        })
+        .join('\n');
     }
-  
+
     const beforeCursor = code.substring(0, cursorPosition);
     const afterCursor = code.substring(cursorPosition);
     const newCode = beforeCursor + insertText + afterCursor;
     setCode(newCode);
     setCursorPosition(cursorPosition + insertText.length);
-  
+
     // Focus editor and set cursor position
     setTimeout(() => {
       if (editorRef.current) {
+        focusFromInsert.current = true;
         editorRef.current.focus();
+        Keyboard.dismiss();
         const start = cursorPosition + insertText.length;
         const end = start;
         // For native platforms use setNativeProps, for web fall back to DOM APIs
@@ -188,6 +213,7 @@ export default function EditorScreen() {
         } else if (typeof input.setSelectionRange === 'function') {
           input.setSelectionRange(start, end);
         }
+        focusFromInsert.current = false;
       }
     }, 100);
   };
@@ -201,9 +227,12 @@ export default function EditorScreen() {
     const indentStep = '    ';
     if (line.startsWith(indentStep)) {
       const newLine = line.substring(indentStep.length);
-      const newCode = code.substring(0, lineStart) + newLine + code.substring(end);
+      const newCode =
+        code.substring(0, lineStart) + newLine + code.substring(end);
       setCode(newCode);
-      setCursorPosition(Math.max(lineStart, cursorPosition - indentStep.length));
+      setCursorPosition(
+        Math.max(lineStart, cursorPosition - indentStep.length),
+      );
     }
   };
 
@@ -211,7 +240,8 @@ export default function EditorScreen() {
     const before = code.substring(0, cursorPosition);
     const lineStart = before.lastIndexOf('\n') + 1;
     let lineEnd = code.indexOf('\n', cursorPosition);
-    if (lineEnd === -1) lineEnd = code.length; else lineEnd += 1;
+    if (lineEnd === -1) lineEnd = code.length;
+    else lineEnd += 1;
     const newCode = code.substring(0, lineStart) + code.substring(lineEnd);
     setCode(newCode);
     setCursorPosition(lineStart);
@@ -257,10 +287,12 @@ export default function EditorScreen() {
   };
 
   const cursor = getCursorCoords();
-  const maxLineLength = Math.max(...code.split('\n').map((line) => line.length));
+  const maxLineLength = Math.max(
+    ...code.split('\n').map((line) => line.length),
+  );
   const contentWidth = Math.max(
     maxLineLength * CHAR_WIDTH + 48,
-    Dimensions.get('window').width - 50
+    Dimensions.get('window').width - 50,
   );
 
   return (
@@ -282,7 +314,10 @@ export default function EditorScreen() {
               </TouchableOpacity>
               <View style={styles.headerActions}>
                 {isKeyboardVisible && (
-                  <TouchableOpacity style={styles.actionButton} onPress={dismissKeyboard}>
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={dismissKeyboard}
+                  >
                     <ChevronDown size={16} color="#007AFF" />
                   </TouchableOpacity>
                 )}
@@ -295,7 +330,10 @@ export default function EditorScreen() {
                 <TouchableOpacity style={styles.actionButton}>
                   <Undo size={16} color="#007AFF" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton} onPress={copyToClipboard}>
+                <TouchableOpacity
+                  style={styles.actionButton}
+                  onPress={copyToClipboard}
+                >
                   <Copy size={16} color="#007AFF" />
                 </TouchableOpacity>
               </View>
@@ -323,23 +361,38 @@ export default function EditorScreen() {
               </View>
             )}
             <View style={styles.editorWrapper}>
-              <ScrollView style={styles.lineNumbers} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.lineNumbers}
+                showsVerticalScrollIndicator={false}
+              >
                 {code.split('\n').map((_, index) => (
                   <Text key={index} style={styles.lineNumber}>
                     {index + 1}
                   </Text>
                 ))}
               </ScrollView>
-              <ScrollView horizontal style={styles.codeScroll} bounces={false} showsHorizontalScrollIndicator={false}>
+              <ScrollView
+                horizontal
+                style={styles.codeScroll}
+                bounces={false}
+                showsHorizontalScrollIndicator={false}
+              >
                 <View style={[styles.codeContainer, { width: contentWidth }]}>
-                  <SyntaxHighlighter code={code} language={"python"} />
-                  <View style={[styles.cursor, { left: cursor.left, top: cursor.top }]} />
+                  <SyntaxHighlighter code={code} language={'python'} />
+                  <View
+                    style={[
+                      styles.cursor,
+                      { left: cursor.left, top: cursor.top },
+                    ]}
+                  />
                   <TextInput
                     ref={editorRef}
                     style={[styles.codeInput, { width: contentWidth }]}
                     value={code}
                     onChangeText={handleTextChange}
-                    onSelectionChange={(event) => setCursorPosition(event.nativeEvent.selection.start)}
+                    onSelectionChange={(event) =>
+                      setCursorPosition(event.nativeEvent.selection.start)
+                    }
                     multiline
                     textAlignVertical="top"
                     selectionColor="#007AFF"
@@ -350,6 +403,15 @@ export default function EditorScreen() {
                     keyboardType="ascii-capable"
                     blurOnSubmit={false}
                     returnKeyType="default"
+                    showSoftInputOnFocus={showSystemKeyboard}
+                    onFocus={() => {
+                      if (focusFromInsert.current) {
+                        setShowSystemKeyboard(false);
+                        Keyboard.dismiss();
+                      } else {
+                        setShowSystemKeyboard(true);
+                      }
+                    }}
                   />
                 </View>
               </ScrollView>
@@ -367,8 +429,8 @@ export default function EditorScreen() {
 
       {/* Terminal Panel */}
       <Animated.View style={[styles.terminalContainer, terminalAnimatedStyle]}>
-        <TerminalPanel 
-          isVisible={isTerminalVisible} 
+        <TerminalPanel
+          isVisible={isTerminalVisible}
           onClose={() => {
             setIsTerminalVisible(false);
             terminalOffset.value = withSpring(screenHeight);
@@ -413,15 +475,15 @@ const styles = StyleSheet.create({
     backgroundColor: '#3C3C3E',
   },
   langButton: {
-    flexDirection: "row",
-    alignItems: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
   langMenu: {
-    position: "absolute",
+    position: 'absolute',
     top: 56,
     left: 16,
-    backgroundColor: "#2C2C2E",
+    backgroundColor: '#2C2C2E',
     borderRadius: 6,
     paddingVertical: 4,
     zIndex: 20,
@@ -431,8 +493,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   langMenuText: {
-    color: "#FFFFFF",
-    fontFamily: "FiraCode-Regular",
+    color: '#FFFFFF',
+    fontFamily: 'FiraCode-Regular',
   },
   editorWrapper: {
     flex: 1,

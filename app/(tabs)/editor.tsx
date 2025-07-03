@@ -26,7 +26,6 @@ import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
 
 const { height: screenHeight } = Dimensions.get('window');
-const LINE_HEIGHT = 20;
 const CHAR_WIDTH = 8.4;
 
 export default function EditorScreen() {
@@ -236,16 +235,6 @@ export default function EditorScreen() {
     Clipboard.setStringAsync(code);
   };
 
-  const getCursorCoords = () => {
-    const beforeCursor = code.substring(0, cursorPosition);
-    const lines = beforeCursor.split('\n');
-    const row = lines.length - 1;
-    const col = lines[lines.length - 1].length;
-    return {
-      top: 16 + row * LINE_HEIGHT,
-      left: 16 + col * CHAR_WIDTH,
-    };
-  };
 
   const runCode = () => {
     // Dismiss keyboard first, then show terminal
@@ -256,7 +245,6 @@ export default function EditorScreen() {
     }, 100);
   };
 
-  const cursor = getCursorCoords();
   const maxLineLength = Math.max(...code.split('\n').map((line) => line.length));
   const contentWidth = Math.max(
     maxLineLength * CHAR_WIDTH + 48,
@@ -333,7 +321,6 @@ export default function EditorScreen() {
               <ScrollView horizontal style={styles.codeScroll} bounces={false} showsHorizontalScrollIndicator={false}>
                 <View style={[styles.codeContainer, { width: contentWidth }]}>
                   <SyntaxHighlighter code={code} language={"python"} />
-                  <View style={[styles.cursor, { left: cursor.left, top: cursor.top }]} />
                   <TextInput
                     ref={editorRef}
                     style={[styles.codeInput, { width: contentWidth }]}
@@ -471,13 +458,6 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     zIndex: 2,
-  },
-  cursor: {
-    position: 'absolute',
-    width: 2,
-    height: LINE_HEIGHT,
-    backgroundColor: '#007AFF',
-    zIndex: 3,
   },
   terminalContainer: {
     position: 'absolute',

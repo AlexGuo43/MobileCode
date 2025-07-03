@@ -66,6 +66,7 @@ export default function EditorScreen() {
   
   const terminalOffset = useSharedValue(screenHeight);
   const editorRef = useRef<TextInput>(null);
+  const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
 
   useEffect(() => {
     async function loadCodeDef() {
@@ -141,6 +142,8 @@ export default function EditorScreen() {
   }));
 
   const insertCode = (text: string) => {
+    setShowSystemKeyboard(false);
+    Keyboard.dismiss();
     let insertText = text;
     
     if (text === '\n') {
@@ -350,6 +353,8 @@ export default function EditorScreen() {
                     keyboardType="ascii-capable"
                     blurOnSubmit={false}
                     returnKeyType="default"
+                    showSoftInputOnFocus={showSystemKeyboard}
+                    onFocus={() => setShowSystemKeyboard(true)}
                   />
                 </View>
               </ScrollView>

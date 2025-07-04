@@ -207,7 +207,8 @@ export function TerminalPanel({ isVisible, onClose, code }: TerminalPanelProps) 
         <ScrollView
           ref={scrollViewRef}
           style={styles.output}
-          showsVerticalScrollIndicator={false}
+          showsVerticalScrollIndicator
+          scrollEnabled
         >
           {output.map((item, index) => (
             <Text

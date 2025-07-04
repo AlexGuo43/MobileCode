@@ -381,7 +381,7 @@ export default function EditorScreen() {
                 {slug && (
                   <TouchableOpacity
                     style={styles.actionButton}
-                    onPress={() => Linking.openURL(`https://leetcode.com/${slug}`)}
+                    onPress={() => Linking.openURL(`https://leetcode.com/problems/${slug}`)}
                   >
                     <ExternalLink size={16} color="#007AFF" />
                   </TouchableOpacity>

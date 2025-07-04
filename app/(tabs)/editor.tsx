@@ -291,6 +291,44 @@ export default function EditorScreen() {
     setCursorPosition(lineStart);
   };
 
+  const moveCursor = (pos: number) => {
+    setCursorPosition(pos);
+    setTimeout(() => {
+      if (editorRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const input = editorRef.current as any;
+        if (typeof input.setNativeProps === 'function') {
+          input.setNativeProps({ selection: { start: pos, end: pos } });
+        } else if (typeof input.setSelectionRange === 'function') {
+          input.setSelectionRange(pos, pos);
+        }
+      }
+    }, 0);
+  };
+
+  const moveCursorUp = () => {
+    const before = code.substring(0, cursorPosition);
+    const currentLineStart = before.lastIndexOf('\n') + 1;
+    if (currentLineStart === 0) return;
+    const prevLineEnd = currentLineStart - 1;
+    const prevLineStart = code.lastIndexOf('\n', prevLineEnd - 1) + 1;
+    const col = cursorPosition - currentLineStart;
+    const prevLineLength = prevLineEnd - prevLineStart;
+    moveCursor(prevLineStart + Math.min(col, prevLineLength));
+  };
+
+  const moveCursorDown = () => {
+    const currentLineStart = code.lastIndexOf('\n', cursorPosition - 1) + 1;
+    const nextLineStart = code.indexOf('\n', cursorPosition);
+    if (nextLineStart === -1) return;
+    const followingStart = nextLineStart + 1;
+    const nextLineEnd = code.indexOf('\n', followingStart);
+    const col = cursorPosition - currentLineStart;
+    const nextLineLength =
+      (nextLineEnd === -1 ? code.length : nextLineEnd) - followingStart;
+    moveCursor(followingStart + Math.min(col, nextLineLength));
+  };
+
   const handleTextChange = (text: string) => {
     const before = code.substring(0, cursorPosition);
     const after = code.substring(cursorPosition);
@@ -484,6 +522,8 @@ export default function EditorScreen() {
               onInsert={insertCode}
               onDeindent={deindentLine}
               onDeleteLine={deleteLine}
+              onMoveUpLine={moveCursorUp}
+              onMoveDownLine={moveCursorDown}
             />
           </View>
         </GestureDetector>

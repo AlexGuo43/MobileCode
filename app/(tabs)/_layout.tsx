@@ -1,5 +1,5 @@
 import { Tabs } from 'expo-router';
-import { Code, Terminal, FileText, Settings, Calendar } from 'lucide-react-native';
+import { Code, FileText, Calendar } from 'lucide-react-native';
 
 export default function TabLayout() {
   return (
@@ -40,24 +40,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="terminal"
-        options={{
-          title: 'Terminal',
-          tabBarIcon: ({ size, color }) => (
-            <Terminal size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ size, color }) => (
-            <Settings size={size} color={color} />
-          ),
-        }}
-      />
+      {/** Terminal and Settings tabs removed per user feedback **/}
     </Tabs>
   );
 }

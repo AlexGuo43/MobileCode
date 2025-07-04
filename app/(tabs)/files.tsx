@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,8 @@ import {
   Alert,
 } from 'react-native';
 import { File, Folder, Plus, Search, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2 } from 'lucide-react-native';
+import * as FileSystem from 'expo-file-system';
+import { useRouter } from 'expo-router';
 
 interface FileItem {
   id: string;
@@ -19,20 +21,47 @@ interface FileItem {
   extension?: string;
 }
 
-const mockFiles: FileItem[] = [
-  { id: '1', name: 'main.py', type: 'file', size: '2.4 KB', modified: '2 min ago', extension: 'py' },
-  { id: '2', name: 'utils.py', type: 'file', size: '1.8 KB', modified: '1 hour ago', extension: 'py' },
-  { id: '3', name: 'tests', type: 'folder', modified: '3 hours ago' },
-  { id: '4', name: 'config.json', type: 'file', size: '0.5 KB', modified: '1 day ago', extension: 'json' },
-  { id: '5', name: 'README.md', type: 'file', size: '1.2 KB', modified: '2 days ago', extension: 'md' },
-  { id: '6', name: 'assets', type: 'folder', modified: '1 week ago' },
-  { id: '7', name: 'app.js', type: 'file', size: '5.6 KB', modified: '1 week ago', extension: 'js' },
-  { id: '8', name: 'styles.css', type: 'file', size: '3.2 KB', modified: '2 weeks ago', extension: 'css' },
-];
+const ROOT_DIR = FileSystem.documentDirectory + 'files/';
 
 export default function FilesScreen() {
-  const [files, setFiles] = useState<FileItem[]>(mockFiles);
+  const router = useRouter();
+  const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        await FileSystem.makeDirectoryAsync(ROOT_DIR, { intermediates: true });
+      } catch (e) {
+        // directory probably exists
+      }
+      loadFiles();
+    })();
+  }, []);
+
+  const loadFiles = async () => {
+    try {
+      const names = await FileSystem.readDirectoryAsync(ROOT_DIR);
+      const items: FileItem[] = [];
+      for (const name of names) {
+        const info = await FileSystem.getInfoAsync(ROOT_DIR + name);
+        if (info.exists) {
+          items.push({
+            id: info.uri,
+            name,
+            type: info.isDirectory ? 'folder' : 'file',
+            modified: info.modificationTime
+              ? new Date(info.modificationTime * 1000).toLocaleDateString()
+              : '',
+            extension: name.split('.').pop(),
+          });
+        }
+      }
+      setFiles(items);
+    } catch (err) {
+      console.error('Failed to read directory', err);
+    }
+  };
 
   const getFileIcon = (item: FileItem) => {
     if (item.type === 'folder') {
@@ -53,8 +82,10 @@ export default function FilesScreen() {
   const handleFilePress = (item: FileItem) => {
     if (item.type === 'file') {
       setSelectedFile(item.id);
-      // Here you would typically open the file in the editor
-      Alert.alert('Open File', `Opening ${item.name} in editor`);
+      router.push({
+        pathname: '/(tabs)/editor',
+        params: { fileUri: item.id },
+      });
     } else {
       Alert.alert('Open Folder', `Opening folder ${item.name}`);
     }
@@ -72,26 +103,50 @@ export default function FilesScreen() {
     );
   };
 
-  const createFile = () => {
-    const newFile: FileItem = {
-      id: Date.now().toString(),
-      name: `untitled_${Date.now()}.py`,
-      type: 'file',
-      size: '0 KB',
-      modified: 'just now',
-      extension: 'py',
-    };
-    setFiles([newFile, ...files]);
+  const createFile = async () => {
+    try {
+      const path = `${ROOT_DIR}untitled_${Date.now()}.py`;
+      await FileSystem.writeAsStringAsync(path, '');
+      loadFiles();
+    } catch (e) {
+      console.error('Failed to create file', e);
+    }
   };
 
-  const createFolder = () => {
-    const newFolder: FileItem = {
-      id: Date.now().toString(),
-      name: `new_folder_${Date.now()}`,
-      type: 'folder',
-      modified: 'just now',
-    };
-    setFiles([newFolder, ...files]);
+  const createFolder = async () => {
+    try {
+      const path = `${ROOT_DIR}new_folder_${Date.now()}`;
+      await FileSystem.makeDirectoryAsync(path);
+      loadFiles();
+    } catch (e) {
+      console.error('Failed to create folder', e);
+    }
+  };
+
+  const deleteSelected = async () => {
+    if (!selectedFile) return;
+    try {
+      await FileSystem.deleteAsync(selectedFile, { idempotent: true });
+      setSelectedFile(null);
+      loadFiles();
+    } catch (e) {
+      console.error('Failed to delete', e);
+    }
+  };
+
+  const renameSelected = async () => {
+    if (!selectedFile) return;
+    Alert.prompt('Rename', 'Enter a new name', async (text) => {
+      if (!text) return;
+      try {
+        const newPath = ROOT_DIR + text;
+        await FileSystem.moveAsync({ from: selectedFile, to: newPath });
+        setSelectedFile(null);
+        loadFiles();
+      } catch (e) {
+        console.error('Failed to rename', e);
+      }
+    });
   };
 
   const renderFileItem = ({ item }: { item: FileItem }) => (
@@ -145,11 +200,11 @@ export default function FilesScreen() {
       {/* Bottom Actions */}
       {selectedFile && (
         <View style={styles.bottomActions}>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={renameSelected}>
             <Edit3 size={16} color="#007AFF" />
-            <Text style={styles.actionText}>Edit</Text>
+            <Text style={styles.actionText}>Rename</Text>
           </TouchableOpacity>
-          <TouchableOpacity style={styles.actionButton}>
+          <TouchableOpacity style={styles.actionButton} onPress={deleteSelected}>
             <Trash2 size={16} color="#FF3B30" />
             <Text style={[styles.actionText, { color: '#FF3B30' }]}>Delete</Text>
           </TouchableOpacity>

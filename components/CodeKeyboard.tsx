@@ -17,26 +17,41 @@ interface CodeKeyboardProps {
 }
 
 const pythonSnippets = [
-  { label: 'for', text: 'for i in range():\n    ' },
-  { label: 'def', text: 'def function():\n    ' },
+  { label: '=', text: '= ' },
+  { label: '+=', text: '+= ' },
+  { label: 'ans', text: 'ans ' },
+  { label: 'curr', text: 'curr ' },
+  { label: '0', text: '0 ' },
+  { label: '\'\'', text: '\'\'' },
   { label: 'if', text: 'if condition:\n    ' },
-  { label: 'elif', text: 'elif condition:\n    ' },
   { label: 'else', text: 'else:\n    ' },
+  { label: 'elif', text: 'elif condition:\n    ' },
+  { label: 'for', text: 'for ' },
+  { label: 'i', text: 'i ' },
+  { label: 'x', text: 'x ' },
+  { label: 'num', text: 'num ' },
+  { label: 'c', text: 'c ' },
+  { label: 'in', text: 'in ' },
+  { label: 'while', text: 'while condition:\n    ' },
+  { label: 'len', text: 'len(' },
+  { label: 'enumerate', text: 'enumerate(' },
+  { label: 'range', text: 'range(' },
+  { label: 'chr', text: 'chr(' },
+  { label: 'ord', text: 'ord(' },
+  { label: ')', text: ')' },
+  { label: 'int', text: 'int(' },
+  { label: 'set', text: 'set(' },
+  { label: 'str', text: 'str(' },
+  { label: 'float', text: 'float(' },
+  { label: 'list', text: 'list(' },
+  { label: 'dict', text: 'dict(' },
+  { label: 'print', text: 'print(' },
+  { label: 'input', text: 'input(' },
+  { label: 'def', text: 'def function():\n    ' },
   { label: 'try', text: 'try:\n    \nexcept:\n    ' },
   { label: 'class', text: 'class ClassName:\n    def __init__(self):\n        ' },
   { label: 'import', text: 'import ' },
   { label: 'from', text: 'from module import ' },
-  { label: 'range', text: 'range(' },
-  { label: 'enumerate', text: 'enumerate(' },
-  { label: 'len', text: 'len(' },
-  { label: 'print', text: 'print(' },
-  { label: 'input', text: 'input(' },
-  { label: 'str', text: 'str(' },
-  { label: 'int', text: 'int(' },
-  { label: 'float', text: 'float(' },
-  { label: 'list', text: 'list(' },
-  { label: 'dict', text: 'dict(' },
-  { label: 'set', text: 'set(' },
 ];
 
 const symbols = [
@@ -131,13 +146,13 @@ export function CodeKeyboard({
       {/* Navigation Keys */}
       <View style={styles.navigationRow}>
         <TouchableOpacity style={styles.navButton} onPress={() => onInsert('    ')}>
-          <Text style={styles.navText}>Indent</Text>
+          <Text style={styles.navText}>→</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={onDeindent}>
-          <Text style={styles.navText}>Deindent</Text>
+          <Text style={styles.navText}>←</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={onDeleteLine}>
-          <Text style={styles.navText}>Del Line</Text>
+          <Text style={styles.navText}>Del</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={onMoveUpLine}>
           <Text style={styles.navText}>↑</Text>

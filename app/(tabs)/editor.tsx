@@ -28,10 +28,8 @@ import {
   Redo,
   Plus,
   ChevronDown,
-  Copy,
   ExternalLink,
 } from 'lucide-react-native';
-//import * as Clipboard from 'expo-clipboard';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
@@ -39,10 +37,11 @@ import { TerminalPanel } from '@/components/TerminalPanel';
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
 const CHAR_WIDTH = 8.4;
+const INITIAL_CODE = `# Welcome to Mobile Code Editor\n`;
 
 export default function EditorScreen() {
   const { slug, fileUri } = useLocalSearchParams<{ slug?: string; fileUri?: string }>();
-  const [code, setCode] = useState(`# Welcome to Mobile Code Editor\n`);
+  const [code, setCode] = useState(INITIAL_CODE);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
   const [activeFile, setActiveFile] = useState('main.py');
   const [language, setLanguage] = useState('python');
@@ -50,6 +49,8 @@ export default function EditorScreen() {
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [history, setHistory] = useState([{ code: INITIAL_CODE, cursor: 0 }]);
+  const [historyIndex, setHistoryIndex] = useState(0);
   const getExtension = (lang: string) => {
     const normalizedLang = lang === 'python3' ? 'python' : lang;
     const map: Record<string, string> = {
@@ -104,6 +105,33 @@ export default function EditorScreen() {
   const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
   const focusFromInsert = useRef(false);
 
+  const updateHistory = (newCode: string, newCursor: number) => {
+    setHistory((prev) => {
+      const truncated = prev.slice(0, historyIndex + 1);
+      truncated.push({ code: newCode, cursor: newCursor });
+      return truncated;
+    });
+    setHistoryIndex((prev) => prev + 1);
+  };
+
+  const undo = () => {
+    if (historyIndex <= 0) return;
+    const newIndex = historyIndex - 1;
+    const { code: prevCode, cursor } = history[newIndex];
+    setHistoryIndex(newIndex);
+    setCode(prevCode);
+    moveCursor(cursor);
+  };
+
+  const redo = () => {
+    if (historyIndex >= history.length - 1) return;
+    const newIndex = historyIndex + 1;
+    const { code: nextCode, cursor } = history[newIndex];
+    setHistoryIndex(newIndex);
+    setCode(nextCode);
+    moveCursor(cursor);
+  };
+
   useEffect(() => {
     async function loadCodeDef() {
       if (!slug) return;
@@ -122,6 +150,7 @@ export default function EditorScreen() {
             defs[0];
           if (preferred?.defaultCode) {
             setCode(preferred.defaultCode);
+            updateHistory(preferred.defaultCode, preferred.defaultCode.length);
             setActiveFile(`main.${getExtension(preferred.value)}`);
             if (preferred.value == 'python3') {
               setLanguage('python');
@@ -141,11 +170,12 @@ export default function EditorScreen() {
   useEffect(() => {
     async function loadLocalFile() {
       if (!fileUri) return;
-      try {
-        const content = await FileSystem.readAsStringAsync(fileUri as string);
-        setCode(content);
-        const name = fileUri.split('/').pop() || 'file';
-        setActiveFile(name);
+        try {
+          const content = await FileSystem.readAsStringAsync(fileUri as string);
+          setCode(content);
+          updateHistory(content, content.length);
+          const name = fileUri.split('/').pop() || 'file';
+          setActiveFile(name);
         const ext = name.split('.').pop() || '';
         setLanguage(getLangFromExt(ext));
       } catch (e) {
@@ -239,6 +269,7 @@ export default function EditorScreen() {
     const afterCursor = code.substring(cursorPosition);
     const newCode = beforeCursor + insertText + afterCursor;
     setCode(newCode);
+    updateHistory(newCode, cursorPosition + insertText.length);
     setCursorPosition(cursorPosition + insertText.length);
 
     // Focus editor and set cursor position
@@ -274,6 +305,10 @@ export default function EditorScreen() {
       const newCode =
         code.substring(0, lineStart) + newLine + code.substring(end);
       setCode(newCode);
+      updateHistory(
+        newCode,
+        Math.max(lineStart, cursorPosition - indentStep.length),
+      );
       setCursorPosition(
         Math.max(lineStart, cursorPosition - indentStep.length),
       );
@@ -288,6 +323,7 @@ export default function EditorScreen() {
     else lineEnd += 1;
     const newCode = code.substring(0, lineStart) + code.substring(lineEnd);
     setCode(newCode);
+    updateHistory(newCode, lineStart);
     setCursorPosition(lineStart);
   };
 
@@ -333,13 +369,10 @@ export default function EditorScreen() {
       insertCode('\n');
     } else {
       setCode(text);
+      updateHistory(text, cursorPosition + (text.length - code.length));
     }
   };
 
-  const copyToClipboard = () => {
-    //Clipboard.setStringAsync(code);
-    console.log("Temp. disabled")
-  };
 
   const getCursorCoords = () => {
     const beforeCursor = code.substring(0, cursorPosition);
@@ -419,14 +452,11 @@ export default function EditorScreen() {
                 <TouchableOpacity style={styles.actionButton} onPress={saveFile}>
                   <Save size={16} color="#007AFF" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity style={styles.actionButton} onPress={undo}>
                   <Undo size={16} color="#007AFF" />
                 </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={copyToClipboard}
-                >
-                  <Copy size={16} color="#007AFF" />
+                <TouchableOpacity style={styles.actionButton} onPress={redo}>
+                  <Redo size={16} color="#007AFF" />
                 </TouchableOpacity>
               </View>
             </View>
@@ -442,6 +472,7 @@ export default function EditorScreen() {
                       setShowLangMenu(false);
                       if (def.defaultCode) {
                         setCode(def.defaultCode);
+                        updateHistory(def.defaultCode, def.defaultCode.length);
                         setActiveFile(`main.${getExtension(def.value)}`);
                         setLanguage(def.value);
                       }

@@ -311,22 +311,14 @@ export default function EditorScreen() {
     const currentLineStart = before.lastIndexOf('\n') + 1;
     if (currentLineStart === 0) return;
     const prevLineEnd = currentLineStart - 1;
-    const prevLineStart = code.lastIndexOf('\n', prevLineEnd - 1) + 1;
-    const col = cursorPosition - currentLineStart;
-    const prevLineLength = prevLineEnd - prevLineStart;
-    moveCursor(prevLineStart + Math.min(col, prevLineLength));
+    moveCursor(prevLineEnd);
   };
 
   const moveCursorDown = () => {
-    const currentLineStart = code.lastIndexOf('\n', cursorPosition - 1) + 1;
     const nextLineStart = code.indexOf('\n', cursorPosition);
     if (nextLineStart === -1) return;
-    const followingStart = nextLineStart + 1;
-    const nextLineEnd = code.indexOf('\n', followingStart);
-    const col = cursorPosition - currentLineStart;
-    const nextLineLength =
-      (nextLineEnd === -1 ? code.length : nextLineEnd) - followingStart;
-    moveCursor(followingStart + Math.min(col, nextLineLength));
+    const nextLineEnd = code.indexOf('\n', nextLineStart + 1);
+    moveCursor(nextLineEnd === -1 ? code.length : nextLineEnd);
   };
 
   const handleTextChange = (text: string) => {

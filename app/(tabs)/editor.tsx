@@ -10,6 +10,7 @@ import {
   SafeAreaView,
   Keyboard,
   TouchableWithoutFeedback,
+  Linking,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -28,6 +29,7 @@ import {
   Plus,
   ChevronDown,
   Copy,
+  ExternalLink,
 } from 'lucide-react-native';
 //import * as Clipboard from 'expo-clipboard';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
@@ -376,6 +378,14 @@ export default function EditorScreen() {
                 <TouchableOpacity style={styles.actionButton} onPress={runCode}>
                   <Play size={16} color="#007AFF" />
                 </TouchableOpacity>
+                {slug && (
+                  <TouchableOpacity
+                    style={styles.actionButton}
+                    onPress={() => Linking.openURL(`https://leetcode.com/${slug}`)}
+                  >
+                    <ExternalLink size={16} color="#007AFF" />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.actionButton} onPress={saveFile}>
                   <Save size={16} color="#007AFF" />
                 </TouchableOpacity>

@@ -28,7 +28,6 @@ import {
   Redo,
   Plus,
   ChevronDown,
-  Copy,
   ExternalLink,
 } from 'lucide-react-native';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
@@ -374,25 +373,6 @@ export default function EditorScreen() {
     }
   };
 
-  const copyToClipboard = async () => {
-    try {
-      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(code);
-      } else if (typeof document !== 'undefined') {
-        const textarea = document.createElement('textarea');
-        textarea.value = code;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.focus();
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-      }
-    } catch (e) {
-      console.error('Failed to copy', e);
-    }
-  };
 
   const getCursorCoords = () => {
     const beforeCursor = code.substring(0, cursorPosition);
@@ -477,12 +457,6 @@ export default function EditorScreen() {
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton} onPress={redo}>
                   <Redo size={16} color="#007AFF" />
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.actionButton}
-                  onPress={copyToClipboard}
-                >
-                  <Copy size={16} color="#007AFF" />
                 </TouchableOpacity>
               </View>
             </View>

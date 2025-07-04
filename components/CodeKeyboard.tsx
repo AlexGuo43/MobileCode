@@ -101,6 +101,9 @@ export function CodeKeyboard({
   ];
 
   const currentData = tabs.find(tab => tab.key === activeTab)?.data || [];
+  const halfIndex = Math.ceil(currentData.length / 2);
+  const firstRow = currentData.slice(0, halfIndex);
+  const secondRow = currentData.slice(halfIndex);
 
   return (
     <View style={styles.container}>
@@ -132,7 +135,23 @@ export function CodeKeyboard({
         style={styles.keyboardRow}
         contentContainerStyle={styles.keyboardContent}
       >
-        {currentData.map((item, index) => (
+        {firstRow.map((item, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.keyButton}
+            onPress={() => onInsert(item.text)}
+          >
+            <Text style={styles.keyText}>{item.label}</Text>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.keyboardRow}
+        contentContainerStyle={styles.keyboardContent}
+      >
+        {secondRow.map((item, index) => (
           <TouchableOpacity
             key={index}
             style={styles.keyButton}

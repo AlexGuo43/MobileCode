@@ -7,12 +7,13 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 
 interface CodeKeyboardProps {
   onInsert: (text: string) => void;
   onDeindent?: () => void;
   onDeleteLine?: () => void;
+  onMoveUpLine?: () => void;
+  onMoveDownLine?: () => void;
 }
 
 const pythonSnippets = [
@@ -69,7 +70,13 @@ const collections = [
   { label: 'namedtuple', text: 'collections.namedtuple(' },
 ];
 
-export function CodeKeyboard({ onInsert, onDeindent, onDeleteLine }: CodeKeyboardProps) {
+export function CodeKeyboard({
+  onInsert,
+  onDeindent,
+  onDeleteLine,
+  onMoveUpLine,
+  onMoveDownLine,
+}: CodeKeyboardProps) {
   const [activeTab, setActiveTab] = useState<'snippets' | 'symbols' | 'collections'>('snippets');
 
   const tabs = [
@@ -131,6 +138,12 @@ export function CodeKeyboard({ onInsert, onDeindent, onDeleteLine }: CodeKeyboar
         </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={onDeleteLine}>
           <Text style={styles.navText}>Del Line</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navButton} onPress={onMoveUpLine}>
+          <Text style={styles.navText}>↑</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navButton} onPress={onMoveDownLine}>
+          <Text style={styles.navText}>↓</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={() => onInsert('\n')}>
           <Text style={styles.navText}>↵</Text>

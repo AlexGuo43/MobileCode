@@ -291,6 +291,36 @@ export default function EditorScreen() {
     setCursorPosition(lineStart);
   };
 
+  const moveCursor = (pos: number) => {
+    setCursorPosition(pos);
+    setTimeout(() => {
+      if (editorRef.current) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const input = editorRef.current as any;
+        if (typeof input.setNativeProps === 'function') {
+          input.setNativeProps({ selection: { start: pos, end: pos } });
+        } else if (typeof input.setSelectionRange === 'function') {
+          input.setSelectionRange(pos, pos);
+        }
+      }
+    }, 0);
+  };
+
+  const moveCursorUp = () => {
+    const before = code.substring(0, cursorPosition);
+    const currentLineStart = before.lastIndexOf('\n') + 1;
+    if (currentLineStart === 0) return;
+    const prevLineEnd = currentLineStart - 1;
+    moveCursor(prevLineEnd);
+  };
+
+  const moveCursorDown = () => {
+    const nextLineStart = code.indexOf('\n', cursorPosition);
+    if (nextLineStart === -1) return;
+    const nextLineEnd = code.indexOf('\n', nextLineStart + 1);
+    moveCursor(nextLineEnd === -1 ? code.length : nextLineEnd);
+  };
+
   const handleTextChange = (text: string) => {
     const before = code.substring(0, cursorPosition);
     const after = code.substring(cursorPosition);
@@ -484,6 +514,8 @@ export default function EditorScreen() {
               onInsert={insertCode}
               onDeindent={deindentLine}
               onDeleteLine={deleteLine}
+              onMoveUpLine={moveCursorUp}
+              onMoveDownLine={moveCursorDown}
             />
           </View>
         </GestureDetector>

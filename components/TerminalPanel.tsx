@@ -6,9 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
   StyleSheet,
-  Dimensions,
   Keyboard,
-  TouchableWithoutFeedback,
 } from 'react-native';
 import { X, Play, Trash2, ChevronDown } from 'lucide-react-native';
 
@@ -177,8 +175,7 @@ export function TerminalPanel({ isVisible, onClose, code }: TerminalPanelProps) 
   if (!isVisible) return null;
 
   return (
-    <TouchableWithoutFeedback onPress={dismissKeyboard}>
-      <View style={styles.container}>
+    <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Terminal</Text>
@@ -208,7 +205,8 @@ export function TerminalPanel({ isVisible, onClose, code }: TerminalPanelProps) 
           ref={scrollViewRef}
           style={styles.output}
           showsVerticalScrollIndicator
-          scrollEnabled
+          keyboardDismissMode="on-drag"
+          contentContainerStyle={{ paddingBottom: 16 }}
         >
           {output.map((item, index) => (
             <Text
@@ -242,7 +240,6 @@ export function TerminalPanel({ isVisible, onClose, code }: TerminalPanelProps) 
           />
         </View>
       </View>
-    </TouchableWithoutFeedback>
   );
 }
 

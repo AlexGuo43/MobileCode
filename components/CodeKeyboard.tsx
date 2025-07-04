@@ -82,6 +82,8 @@ const collections = [
   { label: 'Counter', text: 'collections.Counter(' },
   { label: 'OrderedDict', text: 'collections.OrderedDict(' },
   { label: 'deque', text: 'collections.deque(' },
+  { label: 'heappush', text: 'heapq.heappush(' },
+  { label: 'heappop', text: 'heapq.heappop(' },
   { label: 'namedtuple', text: 'collections.namedtuple(' },
 ];
 

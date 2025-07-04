@@ -8,7 +8,7 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { File, Folder, Plus, Search, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2 } from 'lucide-react-native';
+import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2 } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import { useRouter } from 'expo-router';
 
@@ -179,9 +179,6 @@ export default function FilesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Files</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
-            <Search size={20} color="#007AFF" />
-          </TouchableOpacity>
           <TouchableOpacity style={styles.headerButton} onPress={handleCreateFile}>
             <Plus size={20} color="#007AFF" />
           </TouchableOpacity>

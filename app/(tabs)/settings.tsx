@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   SafeAreaView,
   Switch,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   Palette,
   Type,
@@ -34,6 +35,37 @@ export default function SettingsScreen() {
   const [autoComplete, setAutoComplete] = useState(true);
   const [lineNumbers, setLineNumbers] = useState(true);
   const [notifications, setNotifications] = useState(false);
+
+  const loadSettings = async () => {
+    try {
+      const raw = await AsyncStorage.getItem('@settings');
+      if (raw) {
+        const s = JSON.parse(raw);
+        setDarkMode(s.darkMode ?? darkMode);
+        setAutoComplete(s.autoComplete ?? autoComplete);
+        setLineNumbers(s.lineNumbers ?? lineNumbers);
+        setNotifications(s.notifications ?? notifications);
+      }
+    } catch (e) {
+      console.error('Failed to load settings', e);
+    }
+  };
+
+  const persist = async (s: Record<string, boolean>) => {
+    try {
+      await AsyncStorage.setItem('@settings', JSON.stringify(s));
+    } catch (e) {
+      console.error('Failed to save settings', e);
+    }
+  };
+
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  useEffect(() => {
+    persist({ darkMode, autoComplete, lineNumbers, notifications });
+  }, [darkMode, autoComplete, lineNumbers, notifications]);
 
   const settingsSections = [
     {

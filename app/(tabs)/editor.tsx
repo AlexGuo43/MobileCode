@@ -19,6 +19,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useLocalSearchParams } from 'expo-router';
+import * as FileSystem from 'expo-file-system';
 import {
   Play,
   Save,
@@ -38,7 +39,7 @@ const LINE_HEIGHT = 20;
 const CHAR_WIDTH = 8.4;
 
 export default function EditorScreen() {
-  const { slug } = useLocalSearchParams();
+  const { slug, fileUri } = useLocalSearchParams<{ slug?: string; fileUri?: string }>();
   const [code, setCode] = useState(`# Welcome to Mobile Code Editor\n`);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
   const [activeFile, setActiveFile] = useState('main.py');
@@ -70,6 +71,30 @@ export default function EditorScreen() {
       elixir: 'ex',
     };
     return map[normalizedLang] || normalizedLang;
+  };
+
+  const getLangFromExt = (ext: string) => {
+    const map: Record<string, string> = {
+      py: 'python',
+      js: 'javascript',
+      ts: 'typescript',
+      java: 'java',
+      cpp: 'cpp',
+      c: 'c',
+      cs: 'csharp',
+      php: 'php',
+      swift: 'swift',
+      kt: 'kotlin',
+      dart: 'dart',
+      go: 'golang',
+      rb: 'ruby',
+      scala: 'scala',
+      rs: 'rust',
+      rkt: 'racket',
+      erl: 'erlang',
+      ex: 'elixir',
+    };
+    return map[ext] || 'plaintext';
   };
 
   const terminalOffset = useSharedValue(screenHeight);
@@ -110,6 +135,23 @@ export default function EditorScreen() {
 
     loadCodeDef();
   }, [slug]);
+
+  useEffect(() => {
+    async function loadLocalFile() {
+      if (!fileUri) return;
+      try {
+        const content = await FileSystem.readAsStringAsync(fileUri as string);
+        setCode(content);
+        const name = fileUri.split('/').pop() || 'file';
+        setActiveFile(name);
+        const ext = name.split('.').pop() || '';
+        setLanguage(getLangFromExt(ext));
+      } catch (e) {
+        console.error('Failed to load file', e);
+      }
+    }
+    loadLocalFile();
+  }, [fileUri]);
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -287,6 +329,15 @@ export default function EditorScreen() {
     }, 100);
   };
 
+  const saveFile = async () => {
+    if (!fileUri) return;
+    try {
+      await FileSystem.writeAsStringAsync(fileUri as string, code);
+    } catch (e) {
+      console.error('Failed to save file', e);
+    }
+  };
+
   const cursor = getCursorCoords();
   const maxLineLength = Math.max(
     ...code.split('\n').map((line) => line.length),
@@ -325,7 +376,7 @@ export default function EditorScreen() {
                 <TouchableOpacity style={styles.actionButton} onPress={runCode}>
                   <Play size={16} color="#007AFF" />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionButton}>
+                <TouchableOpacity style={styles.actionButton} onPress={saveFile}>
                   <Save size={16} color="#007AFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton}>

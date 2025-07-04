@@ -80,7 +80,10 @@ export function SyntaxHighlighter({ code, language }: SyntaxHighlighterProps) {
       return (
         <Text key={lineIndex} style={styles.line}>
           {tokens.map((token, tokenIndex) => (
-            <Text key={tokenIndex} style={[styles.token, styles[token.type]]}>
+            <Text
+              key={tokenIndex}
+              style={[styles.token, styles[token.type as keyof typeof styles]]}
+            >
               {token.text}
             </Text>
           ))}

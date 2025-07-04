@@ -31,7 +31,6 @@ import {
   Copy,
   ExternalLink,
 } from 'lucide-react-native';
-import * as Clipboard from 'expo-clipboard';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
@@ -379,8 +378,16 @@ export default function EditorScreen() {
     try {
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(code);
-      } else {
-        await Clipboard.setStringAsync(code);
+      } else if (typeof document !== 'undefined') {
+        const textarea = document.createElement('textarea');
+        textarea.value = code;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
       }
     } catch (e) {
       console.error('Failed to copy', e);

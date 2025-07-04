@@ -132,7 +132,7 @@ export function CodeKeyboard({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.keyboardRow}
+        style={[styles.keyboardRow, styles.firstRow]}
         contentContainerStyle={styles.keyboardContent}
       >
         {firstRow.map((item, index) => (
@@ -148,7 +148,7 @@ export function CodeKeyboard({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
-        style={styles.keyboardRow}
+        style={[styles.keyboardRow, styles.secondRow]}
         contentContainerStyle={styles.keyboardContent}
       >
         {secondRow.map((item, index) => (
@@ -219,6 +219,12 @@ const styles = StyleSheet.create({
   },
   keyboardRow: {
     paddingVertical: 12,
+  },
+  firstRow: {
+    paddingBottom: 6,
+  },
+  secondRow: {
+    paddingTop: 6,
   },
   keyboardContent: {
     paddingHorizontal: 16,

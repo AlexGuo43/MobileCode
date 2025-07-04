@@ -28,7 +28,7 @@ import {
   ChevronDown,
   Copy,
 } from 'lucide-react-native';
-import * as Clipboard from 'expo-clipboard';
+//import * as Clipboard from 'expo-clipboard';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
@@ -263,7 +263,8 @@ export default function EditorScreen() {
   };
 
   const copyToClipboard = () => {
-    Clipboard.setStringAsync(code);
+    //Clipboard.setStringAsync(code);
+    console.log("Temp. disabled")
   };
 
   const getCursorCoords = () => {

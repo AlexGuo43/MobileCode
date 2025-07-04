@@ -24,7 +24,13 @@
     "plugins": [
       "expo-router",
       "expo-font",
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-dev-client",
+        {
+          "launchMode": "most-recent"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   StyleSheet,
   Keyboard,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { X, Play, Trash2, ChevronDown } from 'lucide-react-native';
 
@@ -175,7 +177,10 @@ export function TerminalPanel({ isVisible, onClose, code }: TerminalPanelProps) 
   if (!isVisible) return null;
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={styles.container}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
         {/* Header */}
         <View style={styles.header}>
           <Text style={styles.title}>Terminal</Text>
@@ -239,7 +244,7 @@ export function TerminalPanel({ isVisible, onClose, code }: TerminalPanelProps) 
             blurOnSubmit={false}
           />
         </View>
-      </View>
+      </KeyboardAvoidingView>
   );
 }
 

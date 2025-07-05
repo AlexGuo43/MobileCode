@@ -214,7 +214,7 @@ export default function EditorScreen() {
     const newVisibility = !isTerminalVisible;
     setIsTerminalVisible(newVisibility);
     terminalOffset.value = withSpring(
-      newVisibility ? screenHeight * 0.4 : screenHeight,
+      newVisibility ? screenHeight * 0.15 : screenHeight,
     );
     if (newVisibility) {
       dismissKeyboard();
@@ -390,7 +390,7 @@ export default function EditorScreen() {
     dismissKeyboard();
     setTimeout(() => {
       setIsTerminalVisible(true);
-      terminalOffset.value = withSpring(screenHeight * 0.4);
+      terminalOffset.value = withSpring(screenHeight * 0.15);
     }, 100);
   };
 
@@ -670,8 +670,8 @@ const styles = StyleSheet.create({
     position: 'absolute',
     left: 0,
     right: 0,
-    bottom: 0,
-    height: screenHeight * 0.6,
+    bottom: 90,
+    height: '80%',
     backgroundColor: '#000000',
     zIndex: 10,
   },

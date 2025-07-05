@@ -211,7 +211,12 @@ export function TerminalPanel({ isVisible, onClose, code }: TerminalPanelProps) 
           style={styles.output}
           showsVerticalScrollIndicator
           keyboardDismissMode="on-drag"
-          contentContainerStyle={{ paddingBottom: 16 }}
+          bounces={false}
+          contentContainerStyle={{ paddingBottom: 50 }}
+          contentInsetAdjustmentBehavior="never"
+          automaticallyAdjustContentInsets={false}
+          nestedScrollEnabled={true}
+          scrollEnabled={true}
         >
           {output.map((item, index) => (
             <Text
@@ -281,6 +286,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 16,
     paddingVertical: 12,
+    maxHeight: '100%',
   },
   outputText: {
     color: '#FFFFFF',

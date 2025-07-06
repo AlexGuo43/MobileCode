@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,6 +7,9 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
+import { Settings } from 'lucide-react-native';
+import { storage } from '../utils/storage';
+import { KeyboardCustomizer, KeyboardTab, KeyboardButton } from './KeyboardCustomizer';
 
 interface CodeKeyboardProps {
   onInsert: (text: string) => void;
@@ -16,75 +19,87 @@ interface CodeKeyboardProps {
   onMoveDownLine?: () => void;
 }
 
-const pythonSnippets = [
-  { label: '=', text: '= ' },
-  { label: '+=', text: '+= ' },
-  { label: 'ans', text: 'ans ' },
-  { label: 'curr', text: 'curr ' },
-  { label: '0', text: '0 ' },
-  { label: '\'\'', text: '\'\'' },
-  { label: 'if', text: 'if condition:\n    ' },
-  { label: 'else', text: 'else:\n    ' },
-  { label: 'elif', text: 'elif condition:\n    ' },
-  { label: 'for', text: 'for ' },
-  { label: 'i', text: 'i ' },
-  { label: 'x', text: 'x ' },
-  { label: 'num', text: 'num ' },
-  { label: 'c', text: 'c ' },
-  { label: 'in', text: 'in ' },
-  { label: 'while', text: 'while condition:\n    ' },
-  { label: 'len', text: 'len(' },
-  { label: 'enumerate', text: 'enumerate(' },
-  { label: 'range', text: 'range(' },
-  { label: 'chr', text: 'chr(' },
-  { label: 'ord', text: 'ord(' },
-  { label: ')', text: ')' },
-  { label: 'int', text: 'int(' },
-  { label: 'set', text: 'set(' },
-  { label: 'str', text: 'str(' },
-  { label: 'float', text: 'float(' },
-  { label: 'list', text: 'list(' },
-  { label: 'dict', text: 'dict(' },
-  { label: 'print', text: 'print(' },
-  { label: 'input', text: 'input(' },
-  { label: 'def', text: 'def function():\n    ' },
-  { label: 'try', text: 'try:\n    \nexcept:\n    ' },
-  { label: 'class', text: 'class ClassName:\n    def __init__(self):\n        ' },
-  { label: 'import', text: 'import ' },
-  { label: 'from', text: 'from module import ' },
-];
-
-const symbols = [
-  { label: '()', text: '()' },
-  { label: '[]', text: '[]' },
-  { label: '{}', text: '{}' },
-  { label: '""', text: '""' },
-  { label: "''", text: "''" },
-  { label: ':', text: ':' },
-  { label: ';', text: ';' },
-  { label: '->', text: '->' },
-  { label: '=>', text: '=>' },
-  { label: '==', text: '==' },
-  { label: '!=', text: '!=' },
-  { label: '<=', text: '<=' },
-  { label: '>=', text: '>=' },
-  { label: '&&', text: '&&' },
-  { label: '||', text: '||' },
-  { label: '++', text: '++' },
-  { label: '--', text: '--' },
-  { label: '+=', text: '+=' },
-  { label: '-=', text: '-=' },
-  { label: '*=', text: '*=' },
-];
-
-const collections = [
-  { label: 'defaultdict', text: 'collections.defaultdict(' },
-  { label: 'Counter', text: 'collections.Counter(' },
-  { label: 'OrderedDict', text: 'collections.OrderedDict(' },
-  { label: 'deque', text: 'collections.deque(' },
-  { label: 'heappush', text: 'heapq.heappush(' },
-  { label: 'heappop', text: 'heapq.heappop(' },
-  { label: 'namedtuple', text: 'collections.namedtuple(' },
+const defaultTabs: KeyboardTab[] = [
+  {
+    key: 'snippets',
+    label: 'Snippets',
+    data: [
+      { id: '1', label: '=', text: '= ' },
+      { id: '2', label: '+=', text: '+= ' },
+      { id: '3', label: 'ans', text: 'ans ' },
+      { id: '4', label: 'curr', text: 'curr ' },
+      { id: '5', label: '0', text: '0 ' },
+      { id: '6', label: "''", text: "''" },
+      { id: '7', label: 'if', text: 'if condition:\n    ' },
+      { id: '8', label: 'else', text: 'else:\n    ' },
+      { id: '9', label: 'elif', text: 'elif condition:\n    ' },
+      { id: '10', label: 'for', text: 'for ' },
+      { id: '11', label: 'i', text: 'i ' },
+      { id: '12', label: 'x', text: 'x ' },
+      { id: '13', label: 'num', text: 'num ' },
+      { id: '14', label: 'c', text: 'c ' },
+      { id: '15', label: 'in', text: 'in ' },
+      { id: '16', label: 'while', text: 'while condition:\n    ' },
+      { id: '17', label: 'len', text: 'len(' },
+      { id: '18', label: 'enumerate', text: 'enumerate(' },
+      { id: '19', label: 'range', text: 'range(' },
+      { id: '20', label: 'chr', text: 'chr(' },
+      { id: '21', label: 'ord', text: 'ord(' },
+      { id: '22', label: ')', text: ')' },
+      { id: '23', label: 'int', text: 'int(' },
+      { id: '24', label: 'set', text: 'set(' },
+      { id: '25', label: 'str', text: 'str(' },
+      { id: '26', label: 'float', text: 'float(' },
+      { id: '27', label: 'list', text: 'list(' },
+      { id: '28', label: 'dict', text: 'dict(' },
+      { id: '29', label: 'print', text: 'print(' },
+      { id: '30', label: 'input', text: 'input(' },
+      { id: '31', label: 'def', text: 'def function():\n    ' },
+      { id: '32', label: 'try', text: 'try:\n    \nexcept:\n    ' },
+      { id: '33', label: 'class', text: 'class ClassName:\n    def __init__(self):\n        ' },
+      { id: '34', label: 'import', text: 'import ' },
+      { id: '35', label: 'from', text: 'from module import ' },
+    ],
+  },
+  {
+    key: 'symbols',
+    label: 'Symbols',
+    data: [
+      { id: '36', label: '()', text: '()' },
+      { id: '37', label: '[]', text: '[]' },
+      { id: '38', label: '{}', text: '{}' },
+      { id: '39', label: '""', text: '""' },
+      { id: '40', label: "''", text: "''" },
+      { id: '41', label: ':', text: ':' },
+      { id: '42', label: ';', text: ';' },
+      { id: '43', label: '->', text: '->' },
+      { id: '44', label: '=>', text: '=>' },
+      { id: '45', label: '==', text: '==' },
+      { id: '46', label: '!=', text: '!=' },
+      { id: '47', label: '<=', text: '<=' },
+      { id: '48', label: '>=', text: '>=' },
+      { id: '49', label: '&&', text: '&&' },
+      { id: '50', label: '||', text: '||' },
+      { id: '51', label: '++', text: '++' },
+      { id: '52', label: '--', text: '--' },
+      { id: '53', label: '+=', text: '+=' },
+      { id: '54', label: '-=', text: '-=' },
+      { id: '55', label: '*=', text: '*=' },
+    ],
+  },
+  {
+    key: 'collections',
+    label: 'Collections',
+    data: [
+      { id: '56', label: 'defaultdict', text: 'collections.defaultdict(' },
+      { id: '57', label: 'Counter', text: 'collections.Counter(' },
+      { id: '58', label: 'OrderedDict', text: 'collections.OrderedDict(' },
+      { id: '59', label: 'deque', text: 'collections.deque(' },
+      { id: '60', label: 'heappush', text: 'heapq.heappush(' },
+      { id: '61', label: 'heappop', text: 'heapq.heappop(' },
+      { id: '62', label: 'namedtuple', text: 'collections.namedtuple(' },
+    ],
+  },
 ];
 
 export function CodeKeyboard({
@@ -94,15 +109,30 @@ export function CodeKeyboard({
   onMoveUpLine,
   onMoveDownLine,
 }: CodeKeyboardProps) {
-  const [activeTab, setActiveTab] = useState<'snippets' | 'symbols' | 'collections'>('snippets');
+  const [activeTab, setActiveTab] = useState(0);
+  const [tabs, setTabs] = useState<KeyboardTab[]>(defaultTabs);
+  const [showCustomizer, setShowCustomizer] = useState(false);
 
-  const tabs = [
-    { key: 'snippets', label: 'Snippets', data: pythonSnippets },
-    { key: 'symbols', label: 'Symbols', data: symbols },
-    { key: 'collections', label: 'Collections', data: collections },
-  ];
+  useEffect(() => {
+    loadCustomTabs();
+  }, []);
 
-  const currentData = tabs.find(tab => tab.key === activeTab)?.data || [];
+  const loadCustomTabs = async () => {
+    try {
+      const savedTabs = await storage.getItem('customKeyboardTabs');
+      if (savedTabs) {
+        setTabs(JSON.parse(savedTabs));
+      }
+    } catch (error) {
+      console.error('Failed to load custom keyboard tabs:', error);
+    }
+  };
+
+  const handleCustomizerSave = (newTabs: KeyboardTab[]) => {
+    setTabs(newTabs);
+  };
+
+  const currentData = tabs[activeTab]?.data || [];
   const halfIndex = Math.ceil(currentData.length / 2);
   const firstRow = currentData.slice(0, halfIndex);
   const secondRow = currentData.slice(halfIndex);
@@ -111,23 +141,29 @@ export function CodeKeyboard({
     <View style={styles.container}>
       {/* Tab Navigation */}
       <View style={styles.tabContainer}>
-        {tabs.map((tab) => (
+        {tabs.map((tab, index) => (
           <TouchableOpacity
             key={tab.key}
             style={[
               styles.tab,
-              activeTab === tab.key && styles.activeTab,
+              activeTab === index && styles.activeTab,
             ]}
-            onPress={() => setActiveTab(tab.key as any)}
+            onPress={() => setActiveTab(index)}
           >
             <Text style={[
               styles.tabText,
-              activeTab === tab.key && styles.activeTabText,
+              activeTab === index && styles.activeTabText,
             ]}>
               {tab.label}
             </Text>
           </TouchableOpacity>
         ))}
+        <TouchableOpacity
+          style={styles.customizeButton}
+          onPress={() => setShowCustomizer(true)}
+        >
+          <Settings size={16} color="#007AFF" />
+        </TouchableOpacity>
       </View>
 
       {/* Keyboard Buttons */}
@@ -139,7 +175,7 @@ export function CodeKeyboard({
       >
         {firstRow.map((item, index) => (
           <TouchableOpacity
-            key={index}
+            key={item.id}
             style={styles.keyButton}
             onPress={() => onInsert(item.text)}
           >
@@ -155,7 +191,7 @@ export function CodeKeyboard({
       >
         {secondRow.map((item, index) => (
           <TouchableOpacity
-            key={index}
+            key={item.id}
             style={styles.keyButton}
             onPress={() => onInsert(item.text)}
           >
@@ -185,6 +221,13 @@ export function CodeKeyboard({
           <Text style={styles.navText}>↵</Text>
         </TouchableOpacity>
       </View>
+
+      <KeyboardCustomizer
+        isVisible={showCustomizer}
+        onClose={() => setShowCustomizer(false)}
+        onSave={handleCustomizerSave}
+        initialTabs={defaultTabs}
+      />
     </View>
   );
 }
@@ -197,6 +240,7 @@ const styles = StyleSheet.create({
   },
   tabContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     backgroundColor: '#1C1C1E',
     paddingHorizontal: 16,
     paddingTop: 8,
@@ -218,6 +262,12 @@ const styles = StyleSheet.create({
   },
   activeTabText: {
     color: '#FFFFFF',
+  },
+  customizeButton: {
+    padding: 8,
+    marginLeft: 8,
+    borderRadius: 6,
+    backgroundColor: '#3C3C3E',
   },
   keyboardRow: {
     paddingVertical: 12,

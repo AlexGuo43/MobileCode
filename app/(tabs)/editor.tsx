@@ -105,6 +105,7 @@ export default function EditorScreen() {
   const lineNumbersRef = useRef<ScrollView>(null);
   const codeScrollRef = useRef<ScrollView>(null);
   const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const focusFromInsert = useRef(false);
 
   const updateHistory = (newCode: string, newCursor: number) => {
@@ -515,6 +516,21 @@ export default function EditorScreen() {
                         { left: cursor.left, top: cursor.top },
                       ]}
                     />
+                    {/* Overlay to capture double-taps for editing */}
+                    {!isEditing && (
+                      <TouchableOpacity
+                        style={styles.editOverlay}
+                        activeOpacity={1}
+                        onPress={() => {
+                          setIsEditing(true);
+                          setTimeout(() => {
+                            editorRef.current?.focus();
+                            setShowSystemKeyboard(true);
+                          }, 100);
+                        }}
+                      />
+                    )}
+                    {/* TextInput only active when editing */}
                     <TextInput
                       ref={editorRef}
                       style={[styles.codeInput, { width: contentWidth }]}
@@ -533,14 +549,21 @@ export default function EditorScreen() {
                       keyboardType="ascii-capable"
                       blurOnSubmit={false}
                       returnKeyType="default"
-                      showSoftInputOnFocus={showSystemKeyboard}
+                      showSoftInputOnFocus={isEditing}
+                      scrollEnabled={false}
+                      pointerEvents={isEditing ? 'auto' : 'none'}
                       onFocus={() => {
                         if (focusFromInsert.current) {
                           setShowSystemKeyboard(false);
                           Keyboard.dismiss();
                         } else {
+                          setIsEditing(true);
                           setShowSystemKeyboard(true);
                         }
+                      }}
+                      onBlur={() => {
+                        setIsEditing(false);
+                        setShowSystemKeyboard(false);
                       }}
                     />
                   </View>
@@ -653,6 +676,14 @@ const styles = StyleSheet.create({
   codeContentColumn: {
     marginLeft: 50,
     position: 'relative',
+  },
+  editOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 2,
   },
   codeContainer: {
     position: 'relative',

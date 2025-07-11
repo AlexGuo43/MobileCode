@@ -102,6 +102,8 @@ export default function EditorScreen() {
 
   const terminalOffset = useSharedValue(screenHeight);
   const editorRef = useRef<TextInput>(null);
+  const lineNumbersRef = useRef<ScrollView>(null);
+  const codeScrollRef = useRef<ScrollView>(null);
   const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
   const focusFromInsert = useRef(false);
 
@@ -483,62 +485,68 @@ export default function EditorScreen() {
                 ))}
               </View>
             )}
-            <View style={styles.editorWrapper}>
-              <ScrollView
-                style={styles.lineNumbers}
-                showsVerticalScrollIndicator={false}
-              >
-                {code.split('\n').map((_, index) => (
-                  <Text key={index} style={styles.lineNumber}>
-                    {index + 1}
-                  </Text>
-                ))}
-              </ScrollView>
+            <ScrollView
+              style={styles.editorWrapper}
+              showsVerticalScrollIndicator={true}
+              showsHorizontalScrollIndicator={false}
+              bounces={false}
+            >
               <ScrollView
                 horizontal
-                style={styles.codeScroll}
                 bounces={false}
                 showsHorizontalScrollIndicator={false}
               >
-                <View style={[styles.codeContainer, { width: contentWidth }]}>
-                  <SyntaxHighlighter code={code} language={'python'} />
-                  <View
-                    style={[
-                      styles.cursor,
-                      { left: cursor.left, top: cursor.top },
-                    ]}
-                  />
-                  <TextInput
-                    ref={editorRef}
-                    style={[styles.codeInput, { width: contentWidth }]}
-                    value={code}
-                    onChangeText={handleTextChange}
-                    onSelectionChange={(event) =>
-                      setCursorPosition(event.nativeEvent.selection.start)
-                    }
-                    multiline
-                    textAlignVertical="top"
-                    selectionColor="#007AFF"
-                    placeholderTextColor="#8E8E93"
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    spellCheck={false}
-                    keyboardType="ascii-capable"
-                    blurOnSubmit={false}
-                    returnKeyType="default"
-                    showSoftInputOnFocus={showSystemKeyboard}
-                    onFocus={() => {
-                      if (focusFromInsert.current) {
-                        setShowSystemKeyboard(false);
-                        Keyboard.dismiss();
-                      } else {
-                        setShowSystemKeyboard(true);
+                <View style={[styles.codeContainer, { width: contentWidth + 50 }]}>
+                  {/* Line numbers column */}
+                  <View style={styles.lineNumbersColumn}>
+                    {code.split('\n').map((_, index) => (
+                      <Text key={index} style={styles.lineNumber}>
+                        {index + 1}
+                      </Text>
+                    ))}
+                  </View>
+                  
+                  {/* Code content */}
+                  <View style={styles.codeContentColumn}>
+                    <SyntaxHighlighter code={code} language={'python'} />
+                    <View
+                      style={[
+                        styles.cursor,
+                        { left: cursor.left, top: cursor.top },
+                      ]}
+                    />
+                    <TextInput
+                      ref={editorRef}
+                      style={[styles.codeInput, { width: contentWidth }]}
+                      value={code}
+                      onChangeText={handleTextChange}
+                      onSelectionChange={(event) =>
+                        setCursorPosition(event.nativeEvent.selection.start)
                       }
-                    }}
-                  />
+                      multiline
+                      textAlignVertical="top"
+                      selectionColor="#007AFF"
+                      placeholderTextColor="#8E8E93"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      spellCheck={false}
+                      keyboardType="ascii-capable"
+                      blurOnSubmit={false}
+                      returnKeyType="default"
+                      showSoftInputOnFocus={showSystemKeyboard}
+                      onFocus={() => {
+                        if (focusFromInsert.current) {
+                          setShowSystemKeyboard(false);
+                          Keyboard.dismiss();
+                        } else {
+                          setShowSystemKeyboard(true);
+                        }
+                      }}
+                    />
+                  </View>
                 </View>
               </ScrollView>
-            </View>
+            </ScrollView>
 
             {/* Code Keyboard */}
             <CodeKeyboard
@@ -623,14 +631,17 @@ const styles = StyleSheet.create({
   },
   editorWrapper: {
     flex: 1,
-    flexDirection: 'row',
   },
-  lineNumbers: {
+  lineNumbersColumn: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
     width: 50,
-    backgroundColor: '#2C2C2E',
+    backgroundColor: '#1C1C1E',
     paddingTop: 16,
     paddingHorizontal: 8,
-    flexGrow: 0,
+    zIndex: 1,
   },
   lineNumber: {
     color: '#8E8E93',
@@ -639,8 +650,9 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     textAlign: 'right',
   },
-  codeScroll: {
-    flex: 1,
+  codeContentColumn: {
+    marginLeft: 50,
+    position: 'relative',
   },
   codeContainer: {
     position: 'relative',

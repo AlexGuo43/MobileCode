@@ -104,6 +104,7 @@ export default function EditorScreen() {
   const editorRef = useRef<TextInput>(null);
   const lineNumbersRef = useRef<ScrollView>(null);
   const codeScrollRef = useRef<ScrollView>(null);
+  const horizontalScrollRef = useRef<ScrollView>(null);
   const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const focusFromInsert = useRef(false);
@@ -332,17 +333,16 @@ export default function EditorScreen() {
 
   const moveCursor = (pos: number) => {
     setCursorPosition(pos);
-    setTimeout(() => {
-      if (editorRef.current) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const input = editorRef.current as any;
-        if (typeof input.setNativeProps === 'function') {
-          input.setNativeProps({ selection: { start: pos, end: pos } });
-        } else if (typeof input.setSelectionRange === 'function') {
-          input.setSelectionRange(pos, pos);
-        }
+    // Always keep TextInput selection in sync, even when not editing
+    if (editorRef.current) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const input = editorRef.current as any;
+      if (typeof input.setNativeProps === 'function') {
+        input.setNativeProps({ selection: { start: pos, end: pos } });
+      } else if (typeof input.setSelectionRange === 'function') {
+        input.setSelectionRange(pos, pos);
       }
-    }, 0);
+    }
   };
 
   const moveCursorUp = () => {
@@ -491,11 +491,18 @@ export default function EditorScreen() {
               showsVerticalScrollIndicator={true}
               showsHorizontalScrollIndicator={false}
               bounces={false}
+              automaticallyAdjustContentInsets={false}
+              automaticallyAdjustKeyboardInsets={false}
+              keyboardShouldPersistTaps="handled"
             >
               <ScrollView
+                ref={horizontalScrollRef}
                 horizontal
                 bounces={false}
                 showsHorizontalScrollIndicator={false}
+                automaticallyAdjustContentInsets={false}
+                automaticallyAdjustKeyboardInsets={false}
+                keyboardShouldPersistTaps="handled"
               >
                 <View style={[styles.codeContainer, { width: contentWidth + 50 }]}>
                   {/* Line numbers column */}
@@ -535,6 +542,7 @@ export default function EditorScreen() {
                       ref={editorRef}
                       style={[styles.codeInput, { width: contentWidth }]}
                       value={code}
+                      selection={{ start: cursorPosition, end: cursorPosition }}
                       onChangeText={handleTextChange}
                       onSelectionChange={(event) =>
                         setCursorPosition(event.nativeEvent.selection.start)
@@ -551,6 +559,7 @@ export default function EditorScreen() {
                       returnKeyType="default"
                       showSoftInputOnFocus={isEditing}
                       scrollEnabled={false}
+                      disableScrollViewPanResponder={true}
                       pointerEvents={isEditing ? 'auto' : 'none'}
                       onFocus={() => {
                         if (focusFromInsert.current) {

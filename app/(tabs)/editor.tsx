@@ -108,6 +108,7 @@ export default function EditorScreen() {
   const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const focusFromInsert = useRef(false);
+  const [textSelection, setTextSelection] = useState<{start: number, end: number}>({ start: cursorPosition, end: cursorPosition });
 
   const updateHistory = (newCode: string, newCursor: number) => {
     setHistory((prev) => {
@@ -333,7 +334,8 @@ export default function EditorScreen() {
 
   const moveCursor = (pos: number) => {
     setCursorPosition(pos);
-    // Always keep TextInput selection in sync, even when not editing
+    setTextSelection({ start: pos, end: pos });
+    // Always sync TextInput selection
     if (editorRef.current) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const input = editorRef.current as any;
@@ -542,11 +544,14 @@ export default function EditorScreen() {
                       ref={editorRef}
                       style={[styles.codeInput, { width: contentWidth }]}
                       value={code}
-                      selection={{ start: cursorPosition, end: cursorPosition }}
+                      selection={textSelection}
                       onChangeText={handleTextChange}
-                      onSelectionChange={(event) =>
-                        setCursorPosition(event.nativeEvent.selection.start)
-                      }
+                      onSelectionChange={(event) => {
+                        const { start, end } = event.nativeEvent.selection;
+                        setTextSelection({ start, end });
+                        // Update cursor position to the end of selection (or just cursor if no selection)
+                        setCursorPosition(end);
+                      }}
                       multiline
                       textAlignVertical="top"
                       selectionColor="#007AFF"
@@ -559,7 +564,6 @@ export default function EditorScreen() {
                       returnKeyType="default"
                       showSoftInputOnFocus={isEditing}
                       scrollEnabled={false}
-                      disableScrollViewPanResponder={true}
                       pointerEvents={isEditing ? 'auto' : 'none'}
                       onFocus={() => {
                         if (focusFromInsert.current) {

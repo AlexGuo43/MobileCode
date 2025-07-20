@@ -7,9 +7,10 @@ import {
   StyleSheet,
   Dimensions,
 } from 'react-native';
-import { Settings } from 'lucide-react-native';
+import { Settings, Zap, ZapOff } from 'lucide-react-native';
 import { storage } from '../utils/storage';
 import { KeyboardCustomizer, KeyboardTab, KeyboardButton } from './KeyboardCustomizer';
+import { smartKeyboardService, TypingContext, SmartPrediction } from '../utils/smartKeyboard';
 
 interface CodeKeyboardProps {
   onInsert: (text: string) => void;
@@ -17,6 +18,8 @@ interface CodeKeyboardProps {
   onDeleteLine?: () => void;
   onMoveUpLine?: () => void;
   onMoveDownLine?: () => void;
+  currentText?: string;
+  cursorPosition?: number;
 }
 
 const defaultTabs: KeyboardTab[] = [
@@ -108,14 +111,25 @@ export function CodeKeyboard({
   onDeleteLine,
   onMoveUpLine,
   onMoveDownLine,
+  currentText = '',
+  cursorPosition = 0,
 }: CodeKeyboardProps) {
   const [activeTab, setActiveTab] = useState(0);
   const [tabs, setTabs] = useState<KeyboardTab[]>(defaultTabs);
   const [showCustomizer, setShowCustomizer] = useState(false);
+  const [smartMode, setSmartMode] = useState(false);
+  const [smartPredictions, setSmartPredictions] = useState<SmartPrediction[]>([]);
 
   useEffect(() => {
     loadCustomTabs();
+    initializeSmartKeyboard();
   }, []);
+
+  useEffect(() => {
+    if (smartMode) {
+      updateSmartPredictions();
+    }
+  }, [smartMode, currentText, cursorPosition, activeTab]);
 
   const loadCustomTabs = async () => {
     try {
@@ -126,6 +140,42 @@ export function CodeKeyboard({
     } catch (error) {
       console.error('Failed to load custom keyboard tabs:', error);
     }
+  };
+
+  const initializeSmartKeyboard = async () => {
+    await smartKeyboardService.initialize();
+  };
+
+  const getTypingContext = (): TypingContext => {
+    const lines = currentText.split('\n');
+    const currentLineIndex = currentText.substring(0, cursorPosition).split('\n').length - 1;
+    const currentLine = lines[currentLineIndex] || '';
+    const beforeCursor = currentText.substring(0, cursorPosition);
+    
+    // Get text from start of current line to cursor
+    const lineBeforeCursor = beforeCursor.split('\n').pop() || '';
+    // Split by non-word characters but keep meaningful punctuation
+    const words = lineBeforeCursor.split(/[\s\(\)\[\]\{\},;]+/).filter(w => w.length > 0);
+    const lastWord = words[words.length - 1] || '';
+    
+    return {
+      lastWord,
+      currentLine,
+      isNewLine: currentLine.trim() === '',
+      lineIndentation: currentLine.length - currentLine.trimStart().length,
+    };
+  };
+
+  const updateSmartPredictions = () => {
+    const context = getTypingContext();
+    const predictions = smartKeyboardService.getSmartPredictions(tabs, context, 6);
+    setSmartPredictions(predictions);
+  };
+
+  const handleSmartInsert = async (button: KeyboardButton) => {
+    const context = getTypingContext();
+    await smartKeyboardService.recordButtonUsage(button, context);
+    onInsert(button.text);
   };
 
   const handleCustomizerSave = (newTabs: KeyboardTab[]) => {
@@ -160,11 +210,46 @@ export function CodeKeyboard({
         ))}
         <TouchableOpacity
           style={styles.customizeButton}
+          onPress={() => setSmartMode(!smartMode)}
+        >
+          {smartMode ? (
+            <Zap size={16} color="#007AFF" />
+          ) : (
+            <ZapOff size={16} color="#8E8E93" />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.customizeButton}
           onPress={() => setShowCustomizer(true)}
         >
           <Settings size={16} color="#007AFF" />
         </TouchableOpacity>
       </View>
+
+      {/* Smart Row */}
+      {smartMode && smartPredictions.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.smartRow}
+          contentContainerStyle={styles.keyboardContent}
+        >
+          {smartPredictions.map((prediction, index) => (
+            <TouchableOpacity
+              key={`smart-${prediction.button.id}`}
+              style={[styles.keyButton, styles.smartButton]}
+              onPress={() => handleSmartInsert(prediction.button)}
+            >
+              <Text style={styles.keyText}>{prediction.button.label}</Text>
+              <Text style={styles.smartScore}>
+                {prediction.reason === 'recent' ? '🕒' : 
+                 prediction.reason === 'contextual' ? '🎯' : 
+                 prediction.reason === 'newline' ? '📝' : '📊'}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      )}
 
       {/* Keyboard Buttons */}
       <ScrollView
@@ -177,7 +262,7 @@ export function CodeKeyboard({
           <TouchableOpacity
             key={item.id}
             style={styles.keyButton}
-            onPress={() => onInsert(item.text)}
+            onPress={() => smartMode ? handleSmartInsert(item) : onInsert(item.text)}
           >
             <Text style={styles.keyText}>{item.label}</Text>
           </TouchableOpacity>
@@ -193,7 +278,7 @@ export function CodeKeyboard({
           <TouchableOpacity
             key={item.id}
             style={styles.keyButton}
-            onPress={() => onInsert(item.text)}
+            onPress={() => smartMode ? handleSmartInsert(item) : onInsert(item.text)}
           >
             <Text style={styles.keyText}>{item.label}</Text>
           </TouchableOpacity>
@@ -314,5 +399,20 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontFamily: 'FiraCode-Regular',
+  },
+  smartRow: {
+    paddingVertical: 8,
+    backgroundColor: '#1C1C1E',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3C3C3E',
+  },
+  smartButton: {
+    backgroundColor: '#007AFF',
+    flexDirection: 'column',
+    paddingVertical: 6,
+  },
+  smartScore: {
+    fontSize: 8,
+    marginTop: 2,
   },
 });

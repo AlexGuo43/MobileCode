@@ -591,6 +591,8 @@ export default function EditorScreen() {
               onDeleteLine={deleteLine}
               onMoveUpLine={moveCursorUp}
               onMoveDownLine={moveCursorDown}
+              currentText={code}
+              cursorPosition={cursorPosition}
             />
           </View>
         </GestureDetector>

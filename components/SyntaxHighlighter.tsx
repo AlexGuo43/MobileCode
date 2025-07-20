@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { templateService } from '../utils/templateSystem';
 
 interface SyntaxHighlighterProps {
   code: string;
   language: string;
+  onTemplateClick?: (position: number) => void;
 }
 
-export function SyntaxHighlighter({ code, language }: SyntaxHighlighterProps) {
+export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHighlighterProps) {
   const highlightPython = (text: string) => {
     const keywords = [
       'def', 'class', 'if', 'elif', 'else', 'for', 'while', 'try', 'except', 'finally',
@@ -79,14 +81,45 @@ export function SyntaxHighlighter({ code, language }: SyntaxHighlighterProps) {
       
       return (
         <Text key={lineIndex} style={styles.line}>
-          {tokens.map((token, tokenIndex) => (
-            <Text
-              key={tokenIndex}
-              style={[styles.token, styles[token.type as keyof typeof styles]]}
-            >
-              {token.text}
-            </Text>
-          ))}
+          {tokens.map((token, tokenIndex) => {
+            // Calculate position of this token in the full text
+            let position = 0;
+            for (let i = 0; i < lineIndex; i++) {
+              position += lines[i].length + 1; // +1 for newline
+            }
+            for (let i = 0; i < tokenIndex; i++) {
+              position += tokens[i].text.length;
+            }
+            
+            // Check if this token text is a template placeholder
+            const cleanToken = token.text.replace(/[^\w]/g, '').trim(); // Remove punctuation
+            const isTemplate = ['function', 'condition', 'ClassName', 'module', 'var'].includes(cleanToken);
+            
+            // Just highlight templates, use button for interaction
+            if (isTemplate) {
+              return (
+                <Text
+                  key={tokenIndex}
+                  style={[
+                    styles.token, 
+                    styles[token.type as keyof typeof styles],
+                    styles.template
+                  ]}
+                >
+                  {token.text}
+                </Text>
+              );
+            }
+            
+            return (
+              <Text
+                key={tokenIndex}
+                style={[styles.token, styles[token.type as keyof typeof styles]]}
+              >
+                {token.text}
+              </Text>
+            );
+          })}
           {'\n'}
         </Text>
       );
@@ -145,5 +178,14 @@ const styles = StyleSheet.create({
   },
   number: {
     color: '#BD93F9',
+  },
+  template: {
+    backgroundColor: '#007AFF',
+    color: '#FFFFFF',
+    borderRadius: 4,
+    paddingHorizontal: 4,
+  },
+  templateButton: {
+    borderRadius: 4,
   },
 });

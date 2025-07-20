@@ -124,6 +124,7 @@ class SmartKeyboardService {
       'while': 0.7,
       'def': 0.6,
       'class': 0.6,
+      'var': 0.6,
       'try': 0.5,
       'import': 0.5,
       'from': 0.5,

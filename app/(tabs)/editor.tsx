@@ -33,6 +33,8 @@ import {
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
+import { TemplateRenamer } from '@/components/TemplateRenamer';
+import { templateService, TemplateMatch } from '@/utils/templateSystem';
 
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
@@ -48,6 +50,8 @@ export default function EditorScreen() {
   const [codeDefs, setCodeDefs] = useState<any[]>([]);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
+  const [showTemplateRenamer, setShowTemplateRenamer] = useState(false);
+  const [activeTemplate, setActiveTemplate] = useState<TemplateMatch | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [history, setHistory] = useState([{ code: INITIAL_CODE, cursor: 0 }]);
   const [historyIndex, setHistoryIndex] = useState(0);
@@ -117,6 +121,46 @@ export default function EditorScreen() {
       return truncated;
     });
     setHistoryIndex((prev) => prev + 1);
+  };
+
+  const handleTemplateClick = (position: number) => {
+    console.log('handleTemplateClick called with position:', position);
+    console.log('Code around position:', code.substring(Math.max(0, position - 10), position + 10));
+    console.log('Current showTemplateRenamer state:', showTemplateRenamer);
+    
+    const template = templateService.findTemplateAtPosition(code, position);
+    console.log('Found template:', template);
+    
+    if (template) {
+      console.log('Setting activeTemplate and showTemplateRenamer to true');
+      setActiveTemplate(template);
+      setShowTemplateRenamer(true);
+      console.log('Template renamer should now be visible');
+    } else {
+      console.log('No template found at position - forcing first template');
+      // Force it to work with the first template we know exists
+      const allTemplates = templateService.findTemplatesInText(code, 0);
+      if (allTemplates.length > 0) {
+        console.log('Using first template:', allTemplates[0]);
+        setActiveTemplate(allTemplates[0]);
+        setShowTemplateRenamer(true);
+      }
+    }
+  };
+
+  const handleTemplateRename = (newValue: string) => {
+    if (activeTemplate) {
+      const newCode = templateService.replaceTemplate(code, activeTemplate, newValue);
+      setCode(newCode);
+      updateHistory(newCode, cursorPosition);
+      
+      // Update cursor position if it was after the template
+      if (cursorPosition > activeTemplate.end) {
+        const lengthDiff = newValue.length - activeTemplate.placeholder.length;
+        setCursorPosition(cursorPosition + lengthDiff);
+      }
+    }
+    setActiveTemplate(null);
   };
 
   const undo = () => {
@@ -189,6 +233,10 @@ export default function EditorScreen() {
     }
     loadLocalFile();
   }, [fileUri]);
+
+  useEffect(() => {
+    templateService.initialize();
+  }, []);
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -518,7 +566,11 @@ export default function EditorScreen() {
                   
                   {/* Code content */}
                   <View style={styles.codeContentColumn}>
-                    <SyntaxHighlighter code={code} language={'python'} />
+                    <SyntaxHighlighter 
+                      code={code} 
+                      language={'python'} 
+                      onTemplateClick={handleTemplateClick}
+                    />
                     <View
                       style={[
                         styles.cursor,
@@ -584,7 +636,35 @@ export default function EditorScreen() {
               </ScrollView>
             </ScrollView>
 
-            {/* Code Keyboard */}
+            {/* Template Renamer Button */}
+          {(() => {
+            const templates = templateService.findTemplatesInText(code, 0);
+            if (templates.length === 0) return null;
+            
+            return (
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#007AFF',
+                  padding: 10,
+                  marginHorizontal: 16,
+                  marginVertical: 8,
+                  borderRadius: 6,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+                onPress={() => {
+                  handleTemplateClick(templates[0].start);
+                }}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 14 }}>
+                  📝 Rename "{templates[0].placeholder}"
+                </Text>
+              </TouchableOpacity>
+            );
+          })()}
+
+          {/* Code Keyboard */}
             <CodeKeyboard
               onInsert={insertCode}
               onDeindent={deindentLine}
@@ -599,16 +679,29 @@ export default function EditorScreen() {
       </TouchableWithoutFeedback>
 
       {/* Terminal Panel */}
-      <Animated.View style={[styles.terminalContainer, terminalAnimatedStyle]}>
-        <TerminalPanel
-          isVisible={isTerminalVisible}
-          onClose={() => {
-            setIsTerminalVisible(false);
-            terminalOffset.value = withSpring(screenHeight);
-          }}
-          code={code}
-        />
-      </Animated.View>
+      {isTerminalVisible && (
+        <Animated.View style={[styles.terminalContainer, terminalAnimatedStyle]}>
+          <TerminalPanel
+            isVisible={isTerminalVisible}
+            onClose={() => {
+              setIsTerminalVisible(false);
+              terminalOffset.value = withSpring(screenHeight);
+            }}
+            code={code}
+          />
+        </Animated.View>
+      )}
+
+      {/* Template Renamer */}
+      <TemplateRenamer
+        visible={showTemplateRenamer}
+        template={activeTemplate}
+        onClose={() => {
+          setShowTemplateRenamer(false);
+          setActiveTemplate(null);
+        }}
+        onConfirm={handleTemplateRename}
+      />
     </SafeAreaView>
   );
 }

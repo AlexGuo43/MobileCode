@@ -7,6 +7,8 @@ import {
   StyleSheet,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 import { templateService, TemplateMatch } from '../utils/templateSystem';
@@ -60,7 +62,11 @@ export function TemplateRenamer({
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <KeyboardAvoidingView 
+        style={styles.overlay}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+      >
         <View style={styles.container}>
           {/* Header */}
           <View style={styles.header}>
@@ -141,7 +147,7 @@ export function TemplateRenamer({
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }
@@ -210,14 +216,15 @@ const styles = StyleSheet.create({
   overlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
   },
   container: {
     backgroundColor: '#1C1C1E',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingBottom: 34, // Safe area
+    borderRadius: 20,
+    paddingBottom: 20,
     maxHeight: '80%',
+    minHeight: 300,
   },
   header: {
     flexDirection: 'row',

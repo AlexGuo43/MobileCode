@@ -332,6 +332,7 @@ const styles = StyleSheet.create({
   tabContainer: {
     backgroundColor: '#1C1C1E',
     paddingTop: 8,
+    paddingBottom: 8,
   },
   tabContent: {
     flexDirection: 'row',
@@ -408,7 +409,7 @@ const styles = StyleSheet.create({
     fontFamily: 'FiraCode-Regular',
   },
   smartRow: {
-    paddingVertical: 8,
+    paddingBottom: 8,
     backgroundColor: '#1C1C1E',
     borderBottomWidth: 1,
     borderBottomColor: '#3C3C3E',

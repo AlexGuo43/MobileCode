@@ -118,7 +118,7 @@ export function CodeKeyboard({
   const [activeTab, setActiveTab] = useState(0);
   const [tabs, setTabs] = useState<KeyboardTab[]>(defaultTabs);
   const [showCustomizer, setShowCustomizer] = useState(false);
-  const [smartMode, setSmartMode] = useState(false);
+  const [smartMode, setSmartMode] = useState(true);
   const [smartPredictions, setSmartPredictions] = useState<SmartPrediction[]>([]);
 
   useEffect(() => {
@@ -191,7 +191,12 @@ export function CodeKeyboard({
   return (
     <View style={styles.container}>
       {/* Tab Navigation */}
-      <View style={styles.tabContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabContainer}
+        contentContainerStyle={styles.tabContent}
+      >
         {tabs.map((tab, index) => (
           <TouchableOpacity
             key={tab.key}
@@ -225,7 +230,7 @@ export function CodeKeyboard({
         >
           <Settings size={16} color="#007AFF" />
         </TouchableOpacity>
-      </View>
+      </ScrollView>
 
       {/* Smart Row */}
       {smartMode && smartPredictions.length > 0 && (
@@ -325,16 +330,18 @@ const styles = StyleSheet.create({
     borderTopColor: '#3C3C3E',
   },
   tabContainer: {
+    backgroundColor: '#1C1C1E',
+    paddingTop: 8,
+  },
+  tabContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1C1C1E',
     paddingHorizontal: 16,
-    paddingTop: 8,
+    gap: 8,
   },
   tab: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    marginRight: 8,
     borderRadius: 8,
     backgroundColor: '#3C3C3E',
   },
@@ -351,7 +358,6 @@ const styles = StyleSheet.create({
   },
   customizeButton: {
     padding: 8,
-    marginLeft: 8,
     borderRadius: 6,
     backgroundColor: '#3C3C3E',
   },

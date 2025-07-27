@@ -172,17 +172,14 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
     try {
       const results: SyncResults = await syncService.syncAllFiles();
       
-      let message = '';
-      if (results.conflicts > 0) {
-        message = `Synced with ${results.conflicts} conflict${results.conflicts === 1 ? '' : 's'}. `;
-      }
-      
       if (results.failed === 0) {
-        message += `${results.success} file${results.success === 1 ? '' : 's'} synced successfully.`;
-        Alert.alert('Sync Complete', message);
+        if (results.conflicts > 0) {
+          Alert.alert('Sync Complete', 'Files synced successfully with some conflicts resolved.');
+        } else {
+          Alert.alert('Sync Complete', 'Files synced successfully.');
+        }
       } else {
-        message += `${results.success} succeeded, ${results.failed} failed.`;
-        Alert.alert('Sync Completed with Issues', message);
+        Alert.alert('Sync Completed with Issues', 'Some files failed to sync. Please try again.');
       }
     } catch (error) {
       console.error('Sync error:', error);

@@ -10,7 +10,8 @@ import {
 } from 'react-native';
 import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2 } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
+import { AuthButton } from '@/components/AuthButton';
 
 interface FileItem {
   id: string;
@@ -38,6 +39,13 @@ export default function FilesScreen() {
       loadFiles();
     })();
   }, []);
+
+  // Reload files when tab comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadFiles();
+    }, [])
+  );
 
   const loadFiles = async () => {
     try {
@@ -179,6 +187,7 @@ export default function FilesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Files</Text>
         <View style={styles.headerActions}>
+          <AuthButton />
           <TouchableOpacity style={styles.headerButton} onPress={handleCreateFile}>
             <Plus size={20} color="#007AFF" />
           </TouchableOpacity>
@@ -234,11 +243,16 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     gap: 12,
+    flex: 1,
+    justifyContent: 'flex-end',
+    minWidth: 0,
   },
   headerButton: {
     padding: 8,
     borderRadius: 8,
     backgroundColor: '#3C3C3E',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   filesList: {
     flex: 1,

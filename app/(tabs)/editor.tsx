@@ -11,6 +11,7 @@ import {
   Keyboard,
   TouchableWithoutFeedback,
   Linking,
+  Alert,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -113,6 +114,8 @@ export default function EditorScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const focusFromInsert = useRef(false);
   const [textSelection, setTextSelection] = useState<{start: number, end: number}>({ start: cursorPosition, end: cursorPosition });
+  const [isModified, setIsModified] = useState(false);
+  const [originalContent, setOriginalContent] = useState('');
 
   const updateHistory = (newCode: string, newCursor: number) => {
     setHistory((prev) => {
@@ -199,6 +202,8 @@ export default function EditorScreen() {
             defs[0];
           if (preferred?.defaultCode) {
             setCode(preferred.defaultCode);
+            setOriginalContent(preferred.defaultCode);
+            setIsModified(false);
             updateHistory(preferred.defaultCode, preferred.defaultCode.length);
             setActiveFile(`main.${getExtension(preferred.value)}`);
             if (preferred.value == 'python3') {
@@ -222,11 +227,15 @@ export default function EditorScreen() {
         try {
           const content = await FileSystem.readAsStringAsync(fileUri as string);
           setCode(content);
+          setOriginalContent(content);
+          setIsModified(false);
           updateHistory(content, content.length);
           const name = fileUri.split('/').pop() || 'file';
           setActiveFile(name);
         const ext = name.split('.').pop() || '';
         setLanguage(getLangFromExt(ext));
+        // Clear code definitions since this is a local file, not a LeetCode problem
+        setCodeDefs([]);
       } catch (e) {
         console.error('Failed to load file', e);
       }
@@ -236,7 +245,21 @@ export default function EditorScreen() {
 
   useEffect(() => {
     templateService.initialize();
+    
+    // Set initial state for new files
+    if (!slug && !fileUri) {
+      setOriginalContent(INITIAL_CODE);
+      setIsModified(false);
+      setActiveFile('untitled.py');
+      // Clear code definitions since this is a new file, not a LeetCode problem
+      setCodeDefs([]);
+    }
   }, []);
+
+  // Track modifications when code changes
+  // useEffect(() => {
+  //   setIsModified(code !== originalContent);
+  // }, [code, originalContent]);
 
   React.useEffect(() => {
     const keyboardDidShowListener = Keyboard.addListener(
@@ -324,6 +347,8 @@ export default function EditorScreen() {
     setCode(newCode);
     updateHistory(newCode, cursorPosition + insertText.length);
     setCursorPosition(cursorPosition + insertText.length);
+    // Check if content has been modified
+    setIsModified(newCode !== originalContent);
 
     // Focus editor and set cursor position
     setTimeout(() => {
@@ -423,6 +448,8 @@ export default function EditorScreen() {
     } else {
       setCode(text);
       updateHistory(text, cursorPosition + (text.length - code.length));
+      // Check if content has been modified
+      setIsModified(text !== originalContent);
     }
   };
 
@@ -448,11 +475,73 @@ export default function EditorScreen() {
   };
 
   const saveFile = async () => {
-    if (!fileUri) return;
     try {
-      await FileSystem.writeAsStringAsync(fileUri as string, code);
+      if (fileUri) {
+        // Save to existing file
+        await FileSystem.writeAsStringAsync(fileUri as string, code);
+        setOriginalContent(code);
+        setIsModified(false);
+      } else {
+        const extension = getExtension(language);
+        
+        if (slug && codeDefs.length > 0) {
+          // Auto-name using LeetCode problem slug
+          const autoFilename = `lc-${slug}.${extension}`;
+          
+          try {
+            const ROOT_DIR = FileSystem.documentDirectory + 'files/';
+            await FileSystem.makeDirectoryAsync(ROOT_DIR, { intermediates: true });
+            const newPath = ROOT_DIR + autoFilename;
+            
+            await FileSystem.writeAsStringAsync(newPath, code);
+            setOriginalContent(code);
+            setIsModified(false);
+            setActiveFile(autoFilename);
+          } catch (e) {
+            console.error('Failed to save file', e);
+            Alert.alert('Error', 'Failed to save file. Please try again.');
+          }
+        } else {
+          // Prompt for filename for regular files
+          const defaultName = `untitled.${extension}`;
+          
+          Alert.prompt(
+            'Save File',
+            'Enter a filename:',
+            async (filename: string) => {
+              if (!filename || !filename.trim()) {
+                return; // User cancelled or entered empty name
+              }
+              
+              let finalFilename = filename.trim();
+              
+              // Add extension if not provided
+              if (!finalFilename.includes('.')) {
+                finalFilename += `.${extension}`;
+              }
+              
+              try {
+                const ROOT_DIR = FileSystem.documentDirectory + 'files/';
+                await FileSystem.makeDirectoryAsync(ROOT_DIR, { intermediates: true });
+                const newPath = ROOT_DIR + finalFilename;
+                
+                await FileSystem.writeAsStringAsync(newPath, code);
+                setOriginalContent(code);
+                setIsModified(false);
+                setActiveFile(finalFilename);
+              } catch (e) {
+                console.error('Failed to save file', e);
+                Alert.alert('Error', 'Failed to save file. Please try again.');
+              }
+            },
+            'plain-text',
+            defaultName
+          );
+        }
+      }
     } catch (e) {
       console.error('Failed to save file', e);
+      Alert.alert('Error', 'Failed to save file. Please try again.');
     }
   };
 
@@ -477,7 +566,9 @@ export default function EditorScreen() {
                 style={styles.langButton}
                 onPress={() => setShowLangMenu(!showLangMenu)}
               >
-                <Text style={styles.fileName}>{language}</Text>
+                <Text style={styles.fileName} numberOfLines={1} ellipsizeMode="middle">
+                  {activeFile}{isModified ? ' *' : ''}
+                </Text>
                 {codeDefs.length > 1 && (
                   <ChevronDown size={16} color="#FFFFFF" />
                 )}
@@ -525,6 +616,8 @@ export default function EditorScreen() {
                       setShowLangMenu(false);
                       if (def.defaultCode) {
                         setCode(def.defaultCode);
+                        setOriginalContent(def.defaultCode);
+                        setIsModified(false);
                         updateHistory(def.defaultCode, def.defaultCode.length);
                         setActiveFile(`main.${getExtension(def.value)}`);
                         setLanguage(def.value);
@@ -728,6 +821,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontFamily: 'FiraCode-Medium',
+    flexShrink: 1,
   },
   headerActions: {
     flexDirection: 'row',
@@ -742,6 +836,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flex: 1,
+    minWidth: 0,
   },
   langMenu: {
     position: 'absolute',

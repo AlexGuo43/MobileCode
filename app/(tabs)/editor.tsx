@@ -429,6 +429,25 @@ export default function EditorScreen() {
   };
 
   const moveCursorDown = () => {
+    const minLines = 20;
+    const actualLines = code.split('\n').length;
+    
+    if (actualLines < minLines) {
+      // If we have fewer lines than minimum, allow adding new lines
+      const currentLineEnd = code.indexOf('\n', cursorPosition);
+      const isAtEndOfCode = cursorPosition >= code.length;
+      
+      if (isAtEndOfCode || currentLineEnd === -1) {
+        // Add a new line and move cursor there
+        const newCode = code + '\n';
+        setCode(newCode);
+        updateHistory(newCode, newCode.length);
+        setCursorPosition(newCode.length);
+        return;
+      }
+    }
+    
+    // Normal cursor down movement
     const nextLineStart = code.indexOf('\n', cursorPosition);
     if (nextLineStart === -1) return;
     const nextLineEnd = code.indexOf('\n', nextLineStart + 1);
@@ -553,6 +572,17 @@ export default function EditorScreen() {
     maxLineLength * CHAR_WIDTH + 48,
     Dimensions.get('window').width - 50,
   );
+  
+  // Ensure minimum height for 20 lines to improve horizontal scrolling
+  const minLines = 20;
+  const actualLines = code.split('\n').length;
+  const displayLines = Math.max(minLines, actualLines);
+  const contentHeight = displayLines * LINE_HEIGHT + 32; // 32 for padding
+  
+  // Pad the code with empty lines to match the minimum display lines
+  const paddedCode = actualLines < minLines 
+    ? code + '\n'.repeat(minLines - actualLines)
+    : code;
 
   return (
     <SafeAreaView style={styles.container}>
@@ -647,10 +677,10 @@ export default function EditorScreen() {
                 automaticallyAdjustKeyboardInsets={false}
                 keyboardShouldPersistTaps="handled"
               >
-                <View style={[styles.codeContainer, { width: contentWidth + 50 }]}>
+                <View style={[styles.codeContainer, { width: contentWidth + 50, minHeight: contentHeight }]}>
                   {/* Line numbers column */}
                   <View style={styles.lineNumbersColumn}>
-                    {code.split('\n').map((_, index) => (
+                    {Array.from({ length: displayLines }, (_, index) => (
                       <Text key={index} style={styles.lineNumber}>
                         {index + 1}
                       </Text>
@@ -660,7 +690,7 @@ export default function EditorScreen() {
                   {/* Code content */}
                   <View style={styles.codeContentColumn}>
                     <SyntaxHighlighter 
-                      code={code} 
+                      code={paddedCode} 
                       language={'python'} 
                       onTemplateClick={handleTemplateClick}
                     />

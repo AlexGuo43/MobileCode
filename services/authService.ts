@@ -104,40 +104,6 @@ class AuthService {
     }
   }
 
-  async pairWithCode(code: string): Promise<AuthUser | null> {
-    try {
-      const response = await fetch(`${API_BASE_URL}/auth/pair-device`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          code,
-          device_name: this.getDeviceName(),
-          device_type: 'mobile',
-          platform: this.getPlatform(),
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Device pairing failed');
-      }
-
-      const loginData: LoginResponse = data.data;
-
-      // Store auth data securely
-      await SecureStore.setItemAsync(AuthService.ACCESS_TOKEN_KEY, loginData.token);
-      await SecureStore.setItemAsync(AuthService.USER_DATA_KEY, JSON.stringify(loginData.user));
-      await SecureStore.setItemAsync(AuthService.DEVICE_DATA_KEY, JSON.stringify(loginData.device));
-
-      return loginData.user;
-    } catch (error) {
-      console.error('Device pairing error:', error);
-      return null;
-    }
-  }
 
   async getCurrentUser(): Promise<AuthUser | null> {
     try {

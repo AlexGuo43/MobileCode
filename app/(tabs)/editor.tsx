@@ -30,12 +30,14 @@ import {
   Plus,
   ChevronDown,
   ExternalLink,
+  Cloud,
 } from 'lucide-react-native';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
 import { TerminalPanel } from '@/components/TerminalPanel';
 import { TemplateRenamer } from '@/components/TemplateRenamer';
 import { templateService, TemplateMatch } from '@/utils/templateSystem';
+import { syncService } from '@/services/syncService';
 
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
@@ -43,7 +45,12 @@ const CHAR_WIDTH = 8.4;
 const INITIAL_CODE = `# Welcome to Mobile Code Editor\n`;
 
 export default function EditorScreen() {
-  const { slug, fileUri } = useLocalSearchParams<{ slug?: string; fileUri?: string }>();
+  const { slug, fileUri, cloudFileName, isCloudFile } = useLocalSearchParams<{ 
+    slug?: string; 
+    fileUri?: string; 
+    cloudFileName?: string; 
+    isCloudFile?: string; 
+  }>();
   const [code, setCode] = useState(INITIAL_CODE);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
   const [activeFile, setActiveFile] = useState('main.py');
@@ -56,6 +63,7 @@ export default function EditorScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [history, setHistory] = useState([{ code: INITIAL_CODE, cursor: 0 }]);
   const [historyIndex, setHistoryIndex] = useState(0);
+  const [isEditingCloudFile, setIsEditingCloudFile] = useState(false);
   const getExtension = (lang: string) => {
     const normalizedLang = lang === 'python3' ? 'python' : lang;
     const map: Record<string, string> = {
@@ -79,6 +87,32 @@ export default function EditorScreen() {
       elixir: 'ex',
     };
     return map[normalizedLang] || normalizedLang;
+  };
+
+  const saveToCloud = async () => {
+    if (!isEditingCloudFile || !activeFile) return;
+    
+    try {
+      // Create a temp file path for uploading
+      const tempPath = FileSystem.cacheDirectory + activeFile;
+      await FileSystem.writeAsStringAsync(tempPath, code);
+      
+      const success = await syncService.uploadFile(tempPath, activeFile);
+      
+      if (success) {
+        setOriginalContent(code);
+        setIsModified(false);
+        Alert.alert('Success', 'File saved to cloud');
+        
+        // Clean up temp file
+        await FileSystem.deleteAsync(tempPath, { idempotent: true });
+      } else {
+        Alert.alert('Error', 'Failed to save to cloud. Please try again.');
+      }
+    } catch (e) {
+      console.error('Failed to save to cloud', e);
+      Alert.alert('Error', 'Failed to save to cloud. Please try again.');
+    }
   };
 
   const getLangFromExt = (ext: string) => {
@@ -244,13 +278,43 @@ export default function EditorScreen() {
   }, [fileUri]);
 
   useEffect(() => {
+    async function loadCloudFile() {
+      if (!cloudFileName || isCloudFile !== 'true') return;
+      
+      try {
+        // Download the file from cloud
+        const cloudFiles = await syncService.getRemoteFiles();
+        const targetFile = cloudFiles.find(f => f.filename === cloudFileName);
+        
+        if (targetFile) {
+          setCode(targetFile.content);
+          setOriginalContent(targetFile.content);
+          setIsModified(false);
+          updateHistory(targetFile.content, targetFile.content.length);
+          setActiveFile(cloudFileName);
+          setIsEditingCloudFile(true);
+          
+          const ext = cloudFileName.split('.').pop() || '';
+          setLanguage(getLangFromExt(ext));
+          setCodeDefs([]);
+        }
+      } catch (e) {
+        console.error('Failed to load cloud file', e);
+        Alert.alert('Error', 'Failed to load file from cloud');
+      }
+    }
+    loadCloudFile();
+  }, [cloudFileName, isCloudFile]);
+
+  useEffect(() => {
     templateService.initialize();
     
     // Set initial state for new files
-    if (!slug && !fileUri) {
+    if (!slug && !fileUri && !cloudFileName) {
       setOriginalContent(INITIAL_CODE);
       setIsModified(false);
       setActiveFile('untitled.py');
+      setIsEditingCloudFile(false);
       // Clear code definitions since this is a new file, not a LeetCode problem
       setCodeDefs([]);
     }
@@ -626,6 +690,11 @@ export default function EditorScreen() {
                 <TouchableOpacity style={styles.actionButton} onPress={saveFile}>
                   <Save size={16} color="#007AFF" />
                 </TouchableOpacity>
+                {isEditingCloudFile && (
+                  <TouchableOpacity style={styles.actionButton} onPress={saveToCloud}>
+                    <Cloud size={16} color="#007AFF" />
+                  </TouchableOpacity>
+                )}
                 <TouchableOpacity style={styles.actionButton} onPress={undo}>
                   <Undo size={16} color="#007AFF" />
                 </TouchableOpacity>

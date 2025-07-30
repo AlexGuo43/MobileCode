@@ -8,10 +8,12 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2 } from 'lucide-react-native';
+import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud, HardDrive } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AuthButton } from '@/components/AuthButton';
+import { syncService, SyncFile } from '@/services/syncService';
+import { authService } from '@/services/authService';
 
 interface FileItem {
   id: string;
@@ -20,7 +22,10 @@ interface FileItem {
   size?: string;
   modified: string;
   extension?: string;
+  isCloud?: boolean;
 }
+
+type TabType = 'local' | 'cloud';
 
 const ROOT_DIR = FileSystem.documentDirectory + 'files/';
 
@@ -28,6 +33,8 @@ export default function FilesScreen() {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<TabType>('local');
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -36,9 +43,14 @@ export default function FilesScreen() {
       } catch (e) {
         // directory probably exists
       }
+      
+      // Check auth state
+      const user = await authService.getCurrentUser();
+      setIsAuthenticated(!!user);
+      
       loadFiles();
     })();
-  }, []);
+  }, [activeTab]);
 
   // Reload files when tab comes into focus
   useFocusEffect(
@@ -48,6 +60,14 @@ export default function FilesScreen() {
   );
 
   const loadFiles = async () => {
+    if (activeTab === 'local') {
+      await loadLocalFiles();
+    } else {
+      await loadCloudFiles();
+    }
+  };
+
+  const loadLocalFiles = async () => {
     try {
       const names = await FileSystem.readDirectoryAsync(ROOT_DIR);
       const items: FileItem[] = [];
@@ -62,12 +82,36 @@ export default function FilesScreen() {
               ? new Date(info.modificationTime * 1000).toLocaleDateString()
               : '',
             extension: name.split('.').pop(),
+            isCloud: false,
           });
         }
       }
       setFiles(items);
     } catch (err) {
       console.error('Failed to read directory', err);
+    }
+  };
+
+  const loadCloudFiles = async () => {
+    if (!isAuthenticated) {
+      setFiles([]);
+      return;
+    }
+
+    try {
+      const cloudFiles = await syncService.getRemoteFiles();
+      const items: FileItem[] = cloudFiles.map((file: SyncFile) => ({
+        id: file.id,
+        name: file.filename,
+        type: 'file' as const,
+        modified: new Date(file.last_modified).toLocaleDateString(),
+        extension: file.filename.split('.').pop(),
+        isCloud: true,
+      }));
+      setFiles(items);
+    } catch (err) {
+      console.error('Failed to load cloud files', err);
+      setFiles([]);
     }
   };
 
@@ -90,10 +134,22 @@ export default function FilesScreen() {
   const handleFilePress = (item: FileItem) => {
     if (item.type === 'file') {
       setSelectedFile(item.id);
-      router.push({
-        pathname: '/(tabs)/editor',
-        params: { fileUri: item.id },
-      });
+      if (item.isCloud) {
+        // For cloud files, pass the filename and indicate it's from cloud
+        router.push({
+          pathname: '/(tabs)/editor',
+          params: { 
+            cloudFileName: item.name,
+            isCloudFile: 'true'
+          },
+        });
+      } else {
+        // For local files, use the existing fileUri approach
+        router.push({
+          pathname: '/(tabs)/editor',
+          params: { fileUri: item.id },
+        });
+      }
     } else {
       Alert.alert('Open Folder', `Opening folder ${item.name}`);
     }
@@ -187,11 +243,39 @@ export default function FilesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Files</Text>
         <View style={styles.headerActions}>
-          <AuthButton />
+          <AuthButton onAuthStateChange={(user) => setIsAuthenticated(!!user)} />
           <TouchableOpacity style={styles.headerButton} onPress={handleCreateFile}>
             <Plus size={20} color="#007AFF" />
           </TouchableOpacity>
         </View>
+      </View>
+
+      {/* Tabs */}
+      <View style={styles.tabsContainer}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'local' && styles.activeTab]}
+          onPress={() => setActiveTab('local')}
+        >
+          <HardDrive size={16} color={activeTab === 'local' ? '#007AFF' : '#8E8E93'} />
+          <Text style={[styles.tabText, activeTab === 'local' && styles.activeTabText]}>
+            Local
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'cloud' && styles.activeTab]}
+          onPress={() => setActiveTab('cloud')}
+          disabled={!isAuthenticated}
+        >
+          <Cloud size={16} color={activeTab === 'cloud' ? '#007AFF' : (isAuthenticated ? '#8E8E93' : '#4C4C4E')} />
+          <Text style={[
+            styles.tabText, 
+            activeTab === 'cloud' && styles.activeTabText,
+            !isAuthenticated && styles.disabledTabText
+          ]}>
+            Cloud
+          </Text>
+        </TouchableOpacity>
       </View>
 
       {/* Files List */}
@@ -253,6 +337,35 @@ const styles = StyleSheet.create({
     backgroundColor: '#3C3C3E',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  tabsContainer: {
+    flexDirection: 'row',
+    backgroundColor: '#2C2C2E',
+    borderBottomWidth: 1,
+    borderBottomColor: '#3C3C3E',
+  },
+  tab: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    gap: 8,
+  },
+  activeTab: {
+    borderBottomWidth: 2,
+    borderBottomColor: '#007AFF',
+  },
+  tabText: {
+    color: '#8E8E93',
+    fontSize: 14,
+    fontFamily: 'FiraCode-Regular',
+  },
+  activeTabText: {
+    color: '#007AFF',
+  },
+  disabledTabText: {
+    color: '#4C4C4E',
   },
   filesList: {
     flex: 1,

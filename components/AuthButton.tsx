@@ -18,7 +18,7 @@ interface AuthButtonProps {
   onAuthStateChange?: (user: AuthUser | null) => void;
 }
 
-type AuthMode = 'login' | 'register' | 'pair';
+type AuthMode = 'login' | 'register';
 
 export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -31,7 +31,6 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
-  const [pairingCode, setPairingCode] = useState('');
 
   useEffect(() => {
     checkAuthState();
@@ -54,37 +53,9 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
     setEmail('');
     setPassword('');
     setName('');
-    setPairingCode('');
   };
 
   const handleAuth = async () => {
-    if (authMode === 'pair') {
-      if (!pairingCode.trim()) {
-        Alert.alert('Error', 'Please enter a pairing code.');
-        return;
-      }
-      
-      setIsLoading(true);
-      try {
-        const user = await authService.pairWithCode(pairingCode.trim());
-        if (user) {
-          setUser(user);
-          onAuthStateChange?.(user);
-          setShowAuthModal(false);
-          clearForm();
-          Alert.alert('Success', `Welcome, ${user.name}! Your device has been paired.`);
-        } else {
-          Alert.alert('Error', 'Invalid pairing code. Please check and try again.');
-        }
-      } catch (error) {
-        console.error('Pairing error:', error);
-        Alert.alert('Error', 'Failed to pair device. Please try again.');
-      } finally {
-        setIsLoading(false);
-      }
-      return;
-    }
-
     if (!email.trim() || !password.trim()) {
       Alert.alert('Error', 'Please fill in all required fields.');
       return;
@@ -201,7 +172,6 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
           <Text style={styles.modalTitle}>
             {authMode === 'login' && 'Sign In'}
             {authMode === 'register' && 'Create Account'}
-            {authMode === 'pair' && 'Pair Device'}
           </Text>
           <TouchableOpacity
             style={styles.closeButton}
@@ -212,27 +182,7 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
         </View>
 
         <ScrollView style={styles.modalContent} keyboardShouldPersistTaps="handled">
-          {authMode === 'pair' ? (
-            <View>
-              <Text style={styles.description}>
-                Enter the 6-digit pairing code from your other device to sync your files.
-              </Text>
-              <TextInput
-                style={styles.input}
-                placeholder="000000"
-                value={pairingCode}
-                onChangeText={setPairingCode}
-                keyboardType="number-pad"
-                maxLength={6}
-                autoCapitalize="none"
-                autoComplete="off"
-                textAlign="center"
-                fontSize={24}
-                letterSpacing={4}
-              />
-            </View>
-          ) : (
-            <View>
+          <View>
               <Text style={styles.description}>
                 {authMode === 'login' 
                   ? 'Sign in to sync your files across devices.' 
@@ -270,7 +220,6 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
                 autoComplete="password"
               />
             </View>
-          )}
 
           <TouchableOpacity
             style={[styles.authButton, isLoading && styles.authButtonDisabled]}
@@ -283,11 +232,9 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
               <>
                 {authMode === 'login' && <LogIn size={16} color="#FFFFFF" />}
                 {authMode === 'register' && <UserPlus size={16} color="#FFFFFF" />}
-                {authMode === 'pair' && <Smartphone size={16} color="#FFFFFF" />}
                 <Text style={styles.authButtonText}>
                   {authMode === 'login' && 'Sign In'}
                   {authMode === 'register' && 'Create Account'}
-                  {authMode === 'pair' && 'Pair Device'}
                 </Text>
               </>
             )}
@@ -295,21 +242,12 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
 
           <View style={styles.authModeSwitch}>
             {authMode === 'login' ? (
-              <>
-                <TouchableOpacity onPress={() => setAuthMode('register')}>
-                  <Text style={styles.linkText}>Don't have an account? Sign up</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={() => setAuthMode('pair')}>
-                  <Text style={styles.linkText}>Have a pairing code? Pair device</Text>
-                </TouchableOpacity>
-              </>
-            ) : authMode === 'register' ? (
-              <TouchableOpacity onPress={() => setAuthMode('login')}>
-                <Text style={styles.linkText}>Already have an account? Sign in</Text>
+              <TouchableOpacity onPress={() => setAuthMode('register')}>
+                <Text style={styles.linkText}>Don't have an account? Sign up</Text>
               </TouchableOpacity>
             ) : (
               <TouchableOpacity onPress={() => setAuthMode('login')}>
-                <Text style={styles.linkText}>Don't have a code? Sign in instead</Text>
+                <Text style={styles.linkText}>Already have an account? Sign in</Text>
               </TouchableOpacity>
             )}
           </View>

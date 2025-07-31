@@ -571,8 +571,10 @@ export default function EditorScreen() {
         setIsModified(false);
         setLastSavedContent(code);
         
-        // Auto-save to cloud
-        await autoSaveToCloud(activeFile, code);
+        // Auto-save to cloud if authenticated
+        if (isAuthenticated) {
+          await autoSaveToCloud(activeFile, code);
+        }
       } else {
         const extension = getExtension(language);
         
@@ -591,8 +593,10 @@ export default function EditorScreen() {
             setActiveFile(autoFilename);
             setLastSavedContent(code);
             
-            // Auto-save to cloud
-            await autoSaveToCloud(autoFilename, code);
+            // Auto-save to cloud if authenticated
+            if (isAuthenticated) {
+              await autoSaveToCloud(autoFilename, code);
+            }
           } catch (e) {
             console.error('Failed to save file', e);
             Alert.alert('Error', 'Failed to save file. Please try again.');
@@ -627,8 +631,10 @@ export default function EditorScreen() {
                 setActiveFile(finalFilename);
                 setLastSavedContent(code);
                 
-                // Auto-save to cloud
-                await autoSaveToCloud(finalFilename, code);
+                // Auto-save to cloud if authenticated
+                if (isAuthenticated) {
+                  await autoSaveToCloud(finalFilename, code);
+                }
               } catch (e) {
                 console.error('Failed to save file', e);
                 Alert.alert('Error', 'Failed to save file. Please try again.');

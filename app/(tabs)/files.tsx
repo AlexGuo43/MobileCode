@@ -58,7 +58,8 @@ export default function FilesScreen() {
 
   const loadFiles = async () => {
     if (!isAuthenticated) {
-      setFiles([]);
+      // Show local files when not authenticated
+      await loadLocalFiles();
       return;
     }
 
@@ -75,6 +76,33 @@ export default function FilesScreen() {
       setFiles(items);
     } catch (err) {
       console.error('Failed to load cloud files', err);
+      // Fallback to local files if cloud fails
+      await loadLocalFiles();
+    }
+  };
+
+  const loadLocalFiles = async () => {
+    try {
+      const names = await FileSystem.readDirectoryAsync(ROOT_DIR);
+      const items: FileItem[] = [];
+      for (const name of names) {
+        const info = await FileSystem.getInfoAsync(ROOT_DIR + name);
+        if (info.exists) {
+          items.push({
+            id: info.uri,
+            name,
+            type: info.isDirectory ? 'folder' : 'file',
+            modified: info.modificationTime
+              ? new Date(info.modificationTime * 1000).toLocaleDateString()
+              : '',
+            extension: name.split('.').pop(),
+            isSynced: false, // Local files are not synced
+          });
+        }
+      }
+      setFiles(items);
+    } catch (err) {
+      console.error('Failed to read local directory', err);
       setFiles([]);
     }
   };
@@ -111,24 +139,34 @@ export default function FilesScreen() {
     if (!fileToEdit) return;
     
     try {
-      // Download cloud file to local storage for editing
-      const localPath = ROOT_DIR + fileToEdit.name;
-      const success = await syncService.downloadFile(fileToEdit.name, localPath);
-      
-      if (success) {
+      if (fileToEdit.isSynced) {
+        // Cloud file - download first
+        const localPath = ROOT_DIR + fileToEdit.name;
+        const success = await syncService.downloadFile(fileToEdit.name, localPath);
+        
+        if (success) {
+          router.push({
+            pathname: '/(tabs)/editor',
+            params: { 
+              fileUri: localPath,
+              cloudFileName: fileToEdit.name 
+            },
+          });
+        } else {
+          Alert.alert('Error', 'Failed to load file');
+        }
+      } else {
+        // Local file - use existing path
         router.push({
           pathname: '/(tabs)/editor',
           params: { 
-            fileUri: localPath,
-            cloudFileName: fileToEdit.name 
+            fileUri: fileToEdit.id // This is already the local path
           },
         });
-      } else {
-        Alert.alert('Error', 'Failed to load file');
       }
     } catch (error) {
-      console.error('Failed to download file:', error);
-      Alert.alert('Error', 'Failed to load file');
+      console.error('Failed to open file:', error);
+      Alert.alert('Error', 'Failed to open file');
     }
   };
 
@@ -209,13 +247,13 @@ export default function FilesScreen() {
           style: 'destructive',
           onPress: async () => {
             try {
-              if (isAuthenticated) {
+              if (fileToDelete.isSynced && isAuthenticated) {
                 // Delete from cloud
                 await syncService.deleteFile(fileToDelete.name);
               }
               
-              // Also delete local copy if it exists
-              const localPath = ROOT_DIR + fileToDelete.name;
+              // Delete local file
+              const localPath = fileToDelete.isSynced ? ROOT_DIR + fileToDelete.name : fileToDelete.id;
               await FileSystem.deleteAsync(localPath, { idempotent: true });
               
               setSelectedFile(null);
@@ -254,8 +292,8 @@ export default function FilesScreen() {
         }
         
         try {
-          if (isAuthenticated) {
-            // Get the file content first
+          if (fileToRename.isSynced && isAuthenticated) {
+            // Handle cloud file rename
             const cloudFiles = await syncService.getRemoteFiles();
             const currentFile = cloudFiles.find(f => f.filename === fileToRename.name);
             
@@ -275,13 +313,18 @@ export default function FilesScreen() {
                 await FileSystem.deleteAsync(tempPath, { idempotent: true });
               }
             }
-          }
-          
-          // Also rename local copy if it exists
-          const oldLocalPath = ROOT_DIR + fileToRename.name;
-          const newLocalPath = ROOT_DIR + finalName;
-          const localFileInfo = await FileSystem.getInfoAsync(oldLocalPath);
-          if (localFileInfo.exists) {
+            
+            // Rename local copy
+            const oldLocalPath = ROOT_DIR + fileToRename.name;
+            const newLocalPath = ROOT_DIR + finalName;
+            const localFileInfo = await FileSystem.getInfoAsync(oldLocalPath);
+            if (localFileInfo.exists) {
+              await FileSystem.moveAsync({ from: oldLocalPath, to: newLocalPath });
+            }
+          } else {
+            // Handle local file rename
+            const oldLocalPath = fileToRename.id; // This is the full path for local files
+            const newLocalPath = ROOT_DIR + finalName;
             await FileSystem.moveAsync({ from: oldLocalPath, to: newLocalPath });
           }
           

@@ -8,7 +8,7 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud } from 'lucide-react-native';
+import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud, Edit } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AuthButton } from '@/components/AuthButton';
@@ -95,32 +95,40 @@ export default function FilesScreen() {
     return <File size={20} color={iconColor} />;
   };
 
-  const handleFilePress = async (item: FileItem) => {
+  const handleFilePress = (item: FileItem) => {
     if (item.type === 'file') {
-      setSelectedFile(item.id);
-      
-      try {
-        // Download cloud file to local storage for editing
-        const localPath = ROOT_DIR + item.name;
-        const success = await syncService.downloadFile(item.name, localPath);
-        
-        if (success) {
-          router.push({
-            pathname: '/(tabs)/editor',
-            params: { 
-              fileUri: localPath,
-              cloudFileName: item.name 
-            },
-          });
-        } else {
-          Alert.alert('Error', 'Failed to load file');
-        }
-      } catch (error) {
-        console.error('Failed to download file:', error);
-        Alert.alert('Error', 'Failed to load file');
-      }
+      // Just select the file, don't navigate
+      setSelectedFile(selectedFile === item.id ? null : item.id);
     } else {
       Alert.alert('Open Folder', `Opening folder ${item.name}`);
+    }
+  };
+
+  const handleEditSelected = async () => {
+    if (!selectedFile) return;
+    
+    const fileToEdit = files.find(f => f.id === selectedFile);
+    if (!fileToEdit) return;
+    
+    try {
+      // Download cloud file to local storage for editing
+      const localPath = ROOT_DIR + fileToEdit.name;
+      const success = await syncService.downloadFile(fileToEdit.name, localPath);
+      
+      if (success) {
+        router.push({
+          pathname: '/(tabs)/editor',
+          params: { 
+            fileUri: localPath,
+            cloudFileName: fileToEdit.name 
+          },
+        });
+      } else {
+        Alert.alert('Error', 'Failed to load file');
+      }
+    } catch (error) {
+      console.error('Failed to download file:', error);
+      Alert.alert('Error', 'Failed to load file');
     }
   };
 
@@ -186,28 +194,107 @@ export default function FilesScreen() {
 
   const deleteSelected = async () => {
     if (!selectedFile) return;
-    try {
-      await FileSystem.deleteAsync(selectedFile, { idempotent: true });
-      setSelectedFile(null);
-      loadFiles();
-    } catch (e) {
-      console.error('Failed to delete', e);
-    }
+    
+    // Find the selected file to get its name
+    const fileToDelete = files.find(f => f.id === selectedFile);
+    if (!fileToDelete) return;
+    
+    Alert.alert(
+      'Delete File',
+      `Are you sure you want to delete "${fileToDelete.name}"?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              if (isAuthenticated) {
+                // Delete from cloud
+                await syncService.deleteFile(fileToDelete.name);
+              }
+              
+              // Also delete local copy if it exists
+              const localPath = ROOT_DIR + fileToDelete.name;
+              await FileSystem.deleteAsync(localPath, { idempotent: true });
+              
+              setSelectedFile(null);
+              loadFiles();
+            } catch (e) {
+              console.error('Failed to delete', e);
+              Alert.alert('Error', 'Failed to delete file. Please try again.');
+            }
+          }
+        }
+      ]
+    );
   };
 
   const renameSelected = async () => {
     if (!selectedFile) return;
-    Alert.prompt('Rename', 'Enter a new name', async (text) => {
-      if (!text) return;
-      try {
-        const newPath = ROOT_DIR + text;
-        await FileSystem.moveAsync({ from: selectedFile, to: newPath });
-        setSelectedFile(null);
-        loadFiles();
-      } catch (e) {
-        console.error('Failed to rename', e);
-      }
-    });
+    
+    // Find the selected file to get its current name
+    const fileToRename = files.find(f => f.id === selectedFile);
+    if (!fileToRename) return;
+    
+    Alert.prompt(
+      'Rename File', 
+      'Enter a new name:', 
+      async (newName: string) => {
+        if (!newName || !newName.trim()) return;
+        
+        let finalName = newName.trim();
+        
+        // Add extension if not provided
+        if (!finalName.includes('.')) {
+          const currentExt = fileToRename.extension;
+          if (currentExt) {
+            finalName += `.${currentExt}`;
+          }
+        }
+        
+        try {
+          if (isAuthenticated) {
+            // Get the file content first
+            const cloudFiles = await syncService.getRemoteFiles();
+            const currentFile = cloudFiles.find(f => f.filename === fileToRename.name);
+            
+            if (currentFile) {
+              // Create temp file with new name and upload
+              const tempPath = FileSystem.cacheDirectory + finalName;
+              await FileSystem.writeAsStringAsync(tempPath, currentFile.content);
+              
+              // Upload with new name
+              const uploadSuccess = await syncService.uploadFile(tempPath, finalName);
+              
+              if (uploadSuccess) {
+                // Delete old file from cloud
+                await syncService.deleteFile(fileToRename.name);
+                
+                // Clean up temp file
+                await FileSystem.deleteAsync(tempPath, { idempotent: true });
+              }
+            }
+          }
+          
+          // Also rename local copy if it exists
+          const oldLocalPath = ROOT_DIR + fileToRename.name;
+          const newLocalPath = ROOT_DIR + finalName;
+          const localFileInfo = await FileSystem.getInfoAsync(oldLocalPath);
+          if (localFileInfo.exists) {
+            await FileSystem.moveAsync({ from: oldLocalPath, to: newLocalPath });
+          }
+          
+          setSelectedFile(null);
+          loadFiles();
+        } catch (e) {
+          console.error('Failed to rename', e);
+          Alert.alert('Error', 'Failed to rename file. Please try again.');
+        }
+      },
+      'plain-text',
+      fileToRename.name // Default to current name
+    );
   };
 
   const renderFileItem = ({ item }: { item: FileItem }) => (
@@ -269,6 +356,10 @@ export default function FilesScreen() {
       {/* Bottom Actions */}
       {selectedFile && (
         <View style={styles.bottomActions}>
+          <TouchableOpacity style={styles.actionButton} onPress={handleEditSelected}>
+            <Edit size={16} color="#007AFF" />
+            <Text style={styles.actionText}>Edit</Text>
+          </TouchableOpacity>
           <TouchableOpacity style={styles.actionButton} onPress={renameSelected}>
             <Edit3 size={16} color="#007AFF" />
             <Text style={styles.actionText}>Rename</Text>

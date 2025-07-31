@@ -8,7 +8,7 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud, HardDrive } from 'lucide-react-native';
+import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AuthButton } from '@/components/AuthButton';
@@ -22,10 +22,8 @@ interface FileItem {
   size?: string;
   modified: string;
   extension?: string;
-  isCloud?: boolean;
+  isSynced?: boolean;
 }
-
-type TabType = 'local' | 'cloud';
 
 const ROOT_DIR = FileSystem.documentDirectory + 'files/';
 
@@ -33,7 +31,6 @@ export default function FilesScreen() {
   const router = useRouter();
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<TabType>('local');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
@@ -50,49 +47,16 @@ export default function FilesScreen() {
       
       loadFiles();
     })();
-  }, [activeTab]);
+  }, []);
 
-  // Reload files when tab comes into focus
+  // Reload files when tab comes into focus or auth state changes
   useFocusEffect(
     React.useCallback(() => {
       loadFiles();
-    }, [])
+    }, [isAuthenticated])
   );
 
   const loadFiles = async () => {
-    if (activeTab === 'local') {
-      await loadLocalFiles();
-    } else {
-      await loadCloudFiles();
-    }
-  };
-
-  const loadLocalFiles = async () => {
-    try {
-      const names = await FileSystem.readDirectoryAsync(ROOT_DIR);
-      const items: FileItem[] = [];
-      for (const name of names) {
-        const info = await FileSystem.getInfoAsync(ROOT_DIR + name);
-        if (info.exists) {
-          items.push({
-            id: info.uri,
-            name,
-            type: info.isDirectory ? 'folder' : 'file',
-            modified: info.modificationTime
-              ? new Date(info.modificationTime * 1000).toLocaleDateString()
-              : '',
-            extension: name.split('.').pop(),
-            isCloud: false,
-          });
-        }
-      }
-      setFiles(items);
-    } catch (err) {
-      console.error('Failed to read directory', err);
-    }
-  };
-
-  const loadCloudFiles = async () => {
     if (!isAuthenticated) {
       setFiles([]);
       return;
@@ -106,7 +70,7 @@ export default function FilesScreen() {
         type: 'file' as const,
         modified: new Date(file.last_modified).toLocaleDateString(),
         extension: file.filename.split('.').pop(),
-        isCloud: true,
+        isSynced: true,
       }));
       setFiles(items);
     } catch (err) {
@@ -131,24 +95,29 @@ export default function FilesScreen() {
     return <File size={20} color={iconColor} />;
   };
 
-  const handleFilePress = (item: FileItem) => {
+  const handleFilePress = async (item: FileItem) => {
     if (item.type === 'file') {
       setSelectedFile(item.id);
-      if (item.isCloud) {
-        // For cloud files, pass the filename and indicate it's from cloud
-        router.push({
-          pathname: '/(tabs)/editor',
-          params: { 
-            cloudFileName: item.name,
-            isCloudFile: 'true'
-          },
-        });
-      } else {
-        // For local files, use the existing fileUri approach
-        router.push({
-          pathname: '/(tabs)/editor',
-          params: { fileUri: item.id },
-        });
+      
+      try {
+        // Download cloud file to local storage for editing
+        const localPath = ROOT_DIR + item.name;
+        const success = await syncService.downloadFile(item.name, localPath);
+        
+        if (success) {
+          router.push({
+            pathname: '/(tabs)/editor',
+            params: { 
+              fileUri: localPath,
+              cloudFileName: item.name 
+            },
+          });
+        } else {
+          Alert.alert('Error', 'Failed to load file');
+        }
+      } catch (error) {
+        console.error('Failed to download file:', error);
+        Alert.alert('Error', 'Failed to load file');
       }
     } else {
       Alert.alert('Open Folder', `Opening folder ${item.name}`);
@@ -168,13 +137,41 @@ export default function FilesScreen() {
   };
 
   const createFile = async () => {
-    try {
-      const path = `${ROOT_DIR}untitled_${Date.now()}.py`;
-      await FileSystem.writeAsStringAsync(path, '');
-      loadFiles();
-    } catch (e) {
-      console.error('Failed to create file', e);
-    }
+    Alert.prompt(
+      'Create New File',
+      'Enter a filename:',
+      async (filename: string) => {
+        if (!filename || !filename.trim()) {
+          return; // User cancelled or entered empty name
+        }
+        
+        let finalFilename = filename.trim();
+        
+        // Add .py extension if no extension provided
+        if (!finalFilename.includes('.')) {
+          finalFilename += '.py';
+        }
+        
+        try {
+          const path = `${ROOT_DIR}${finalFilename}`;
+          await FileSystem.writeAsStringAsync(path, '# New file\n');
+          
+          // Navigate to editor with the new file
+          router.push({
+            pathname: '/(tabs)/editor',
+            params: { 
+              fileUri: path,
+              cloudFileName: finalFilename 
+            },
+          });
+        } catch (e) {
+          console.error('Failed to create file', e);
+          Alert.alert('Error', 'Failed to create file. Please try again.');
+        }
+      },
+      'plain-text',
+      'untitled.py' // Default filename
+    );
   };
 
   const createFolder = async () => {
@@ -231,9 +228,16 @@ export default function FilesScreen() {
           <Text style={styles.fileModified}>{item.modified}</Text>
         </View>
       </View>
-      <TouchableOpacity style={styles.moreButton}>
-        <MoreVertical size={16} color="#8E8E93" />
-      </TouchableOpacity>
+      <View style={styles.fileActions}>
+        {item.isSynced && (
+          <View style={styles.syncIndicator}>
+            <Cloud size={12} color="#007AFF" />
+          </View>
+        )}
+        <TouchableOpacity style={styles.moreButton}>
+          <MoreVertical size={16} color="#8E8E93" />
+        </TouchableOpacity>
+      </View>
     </TouchableOpacity>
   );
 
@@ -243,39 +247,14 @@ export default function FilesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Files</Text>
         <View style={styles.headerActions}>
-          <AuthButton onAuthStateChange={(user) => setIsAuthenticated(!!user)} />
+          <AuthButton onAuthStateChange={(user) => {
+            setIsAuthenticated(!!user);
+            loadFiles(); // Reload files when auth state changes
+          }} />
           <TouchableOpacity style={styles.headerButton} onPress={handleCreateFile}>
             <Plus size={20} color="#007AFF" />
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Tabs */}
-      <View style={styles.tabsContainer}>
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'local' && styles.activeTab]}
-          onPress={() => setActiveTab('local')}
-        >
-          <HardDrive size={16} color={activeTab === 'local' ? '#007AFF' : '#8E8E93'} />
-          <Text style={[styles.tabText, activeTab === 'local' && styles.activeTabText]}>
-            Local
-          </Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.tab, activeTab === 'cloud' && styles.activeTab]}
-          onPress={() => setActiveTab('cloud')}
-          disabled={!isAuthenticated}
-        >
-          <Cloud size={16} color={activeTab === 'cloud' ? '#007AFF' : (isAuthenticated ? '#8E8E93' : '#4C4C4E')} />
-          <Text style={[
-            styles.tabText, 
-            activeTab === 'cloud' && styles.activeTabText,
-            !isAuthenticated && styles.disabledTabText
-          ]}>
-            Cloud
-          </Text>
-        </TouchableOpacity>
       </View>
 
       {/* Files List */}
@@ -338,35 +317,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  tabsContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#2C2C2E',
-    borderBottomWidth: 1,
-    borderBottomColor: '#3C3C3E',
-  },
-  tab: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    gap: 8,
-  },
-  activeTab: {
-    borderBottomWidth: 2,
-    borderBottomColor: '#007AFF',
-  },
-  tabText: {
-    color: '#8E8E93',
-    fontSize: 14,
-    fontFamily: 'FiraCode-Regular',
-  },
-  activeTabText: {
-    color: '#007AFF',
-  },
-  disabledTabText: {
-    color: '#4C4C4E',
-  },
   filesList: {
     flex: 1,
     paddingTop: 8,
@@ -407,6 +357,14 @@ const styles = StyleSheet.create({
   fileModified: {
     color: '#8E8E93',
     fontSize: 12,
+  },
+  fileActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  syncIndicator: {
+    padding: 4,
   },
   moreButton: {
     padding: 8,

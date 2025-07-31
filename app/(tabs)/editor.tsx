@@ -30,7 +30,6 @@ import {
   Plus,
   ChevronDown,
   ExternalLink,
-  Cloud,
 } from 'lucide-react-native';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
@@ -38,6 +37,7 @@ import { TerminalPanel } from '@/components/TerminalPanel';
 import { TemplateRenamer } from '@/components/TemplateRenamer';
 import { templateService, TemplateMatch } from '@/utils/templateSystem';
 import { syncService } from '@/services/syncService';
+import { authService } from '@/services/authService';
 
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
@@ -45,11 +45,10 @@ const CHAR_WIDTH = 8.4;
 const INITIAL_CODE = `# Welcome to Mobile Code Editor\n`;
 
 export default function EditorScreen() {
-  const { slug, fileUri, cloudFileName, isCloudFile } = useLocalSearchParams<{ 
+  const { slug, fileUri, cloudFileName } = useLocalSearchParams<{ 
     slug?: string; 
     fileUri?: string; 
     cloudFileName?: string; 
-    isCloudFile?: string; 
   }>();
   const [code, setCode] = useState(INITIAL_CODE);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
@@ -63,7 +62,8 @@ export default function EditorScreen() {
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const [history, setHistory] = useState([{ code: INITIAL_CODE, cursor: 0 }]);
   const [historyIndex, setHistoryIndex] = useState(0);
-  const [isEditingCloudFile, setIsEditingCloudFile] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [lastSavedContent, setLastSavedContent] = useState('');
   const getExtension = (lang: string) => {
     const normalizedLang = lang === 'python3' ? 'python' : lang;
     const map: Record<string, string> = {
@@ -89,29 +89,26 @@ export default function EditorScreen() {
     return map[normalizedLang] || normalizedLang;
   };
 
-  const saveToCloud = async () => {
-    if (!isEditingCloudFile || !activeFile) return;
+  const autoSaveToCloud = async (filename: string, content: string) => {
+    if (!isAuthenticated || !filename) return;
     
     try {
       // Create a temp file path for uploading
-      const tempPath = FileSystem.cacheDirectory + activeFile;
-      await FileSystem.writeAsStringAsync(tempPath, code);
+      const tempPath = FileSystem.cacheDirectory + filename;
+      await FileSystem.writeAsStringAsync(tempPath, content);
       
-      const success = await syncService.uploadFile(tempPath, activeFile);
+      const success = await syncService.uploadFile(tempPath, filename);
+      
+      // Clean up temp file
+      await FileSystem.deleteAsync(tempPath, { idempotent: true });
       
       if (success) {
-        setOriginalContent(code);
-        setIsModified(false);
-        Alert.alert('Success', 'File saved to cloud');
-        
-        // Clean up temp file
-        await FileSystem.deleteAsync(tempPath, { idempotent: true });
+        console.log('Auto-saved to cloud:', filename);
       } else {
-        Alert.alert('Error', 'Failed to save to cloud. Please try again.');
+        console.warn('Auto-save to cloud failed:', filename);
       }
     } catch (e) {
-      console.error('Failed to save to cloud', e);
-      Alert.alert('Error', 'Failed to save to cloud. Please try again.');
+      console.error('Auto-save to cloud error:', e);
     }
   };
 
@@ -263,9 +260,10 @@ export default function EditorScreen() {
           setCode(content);
           setOriginalContent(content);
           setIsModified(false);
+          setLastSavedContent(content);
           updateHistory(content, content.length);
           const name = fileUri.split('/').pop() || 'file';
-          setActiveFile(name);
+          setActiveFile(cloudFileName || name);
         const ext = name.split('.').pop() || '';
         setLanguage(getLangFromExt(ext));
         // Clear code definitions since this is a local file, not a LeetCode problem
@@ -275,50 +273,57 @@ export default function EditorScreen() {
       }
     }
     loadLocalFile();
-  }, [fileUri]);
+  }, [fileUri, cloudFileName]);
 
-  useEffect(() => {
-    async function loadCloudFile() {
-      if (!cloudFileName || isCloudFile !== 'true') return;
-      
-      try {
-        // Download the file from cloud
-        const cloudFiles = await syncService.getRemoteFiles();
-        const targetFile = cloudFiles.find(f => f.filename === cloudFileName);
-        
-        if (targetFile) {
-          setCode(targetFile.content);
-          setOriginalContent(targetFile.content);
-          setIsModified(false);
-          updateHistory(targetFile.content, targetFile.content.length);
-          setActiveFile(cloudFileName);
-          setIsEditingCloudFile(true);
-          
-          const ext = cloudFileName.split('.').pop() || '';
-          setLanguage(getLangFromExt(ext));
-          setCodeDefs([]);
-        }
-      } catch (e) {
-        console.error('Failed to load cloud file', e);
-        Alert.alert('Error', 'Failed to load file from cloud');
-      }
-    }
-    loadCloudFile();
-  }, [cloudFileName, isCloudFile]);
 
   useEffect(() => {
     templateService.initialize();
+    
+    // Check auth state
+    (async () => {
+      const user = await authService.getCurrentUser();
+      setIsAuthenticated(!!user);
+    })();
     
     // Set initial state for new files
     if (!slug && !fileUri && !cloudFileName) {
       setOriginalContent(INITIAL_CODE);
       setIsModified(false);
       setActiveFile('untitled.py');
-      setIsEditingCloudFile(false);
       // Clear code definitions since this is a new file, not a LeetCode problem
       setCodeDefs([]);
     }
   }, []);
+
+  // Periodic auto-save - saves every 3 seconds when there are changes
+  useEffect(() => {
+    const autoSaveInterval = setInterval(async () => {
+      // Only auto-save if:
+      // 1. There are unsaved changes (code different from last saved)
+      // 2. We have a file to save to (fileUri exists)
+      // 3. File is not just the default untitled.py
+      if (code !== lastSavedContent && fileUri && activeFile !== 'untitled.py') {
+        try {
+          // Save locally
+          await FileSystem.writeAsStringAsync(fileUri as string, code);
+          setLastSavedContent(code);
+          setOriginalContent(code);
+          setIsModified(false);
+          
+          // Auto-save to cloud if authenticated
+          if (isAuthenticated) {
+            await autoSaveToCloud(activeFile, code);
+          }
+          
+          console.log('Auto-saved:', activeFile);
+        } catch (error) {
+          console.error('Auto-save failed:', error);
+        }
+      }
+    }, 3000); // Auto-save every 3 seconds
+
+    return () => clearInterval(autoSaveInterval);
+  }, [code, lastSavedContent, fileUri, activeFile, isAuthenticated]);
 
   // Track modifications when code changes
   // useEffect(() => {
@@ -564,6 +569,10 @@ export default function EditorScreen() {
         await FileSystem.writeAsStringAsync(fileUri as string, code);
         setOriginalContent(code);
         setIsModified(false);
+        setLastSavedContent(code);
+        
+        // Auto-save to cloud
+        await autoSaveToCloud(activeFile, code);
       } else {
         const extension = getExtension(language);
         
@@ -580,6 +589,10 @@ export default function EditorScreen() {
             setOriginalContent(code);
             setIsModified(false);
             setActiveFile(autoFilename);
+            setLastSavedContent(code);
+            
+            // Auto-save to cloud
+            await autoSaveToCloud(autoFilename, code);
           } catch (e) {
             console.error('Failed to save file', e);
             Alert.alert('Error', 'Failed to save file. Please try again.');
@@ -612,6 +625,10 @@ export default function EditorScreen() {
                 setOriginalContent(code);
                 setIsModified(false);
                 setActiveFile(finalFilename);
+                setLastSavedContent(code);
+                
+                // Auto-save to cloud
+                await autoSaveToCloud(finalFilename, code);
               } catch (e) {
                 console.error('Failed to save file', e);
                 Alert.alert('Error', 'Failed to save file. Please try again.');
@@ -690,11 +707,6 @@ export default function EditorScreen() {
                 <TouchableOpacity style={styles.actionButton} onPress={saveFile}>
                   <Save size={16} color="#007AFF" />
                 </TouchableOpacity>
-                {isEditingCloudFile && (
-                  <TouchableOpacity style={styles.actionButton} onPress={saveToCloud}>
-                    <Cloud size={16} color="#007AFF" />
-                  </TouchableOpacity>
-                )}
                 <TouchableOpacity style={styles.actionButton} onPress={undo}>
                   <Undo size={16} color="#007AFF" />
                 </TouchableOpacity>

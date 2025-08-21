@@ -251,11 +251,6 @@ export function CodeKeyboard({
               onPress={() => handleSmartInsert(prediction.button)}
             >
               <Text style={styles.keyText}>{prediction.button.label}</Text>
-              <Text style={styles.smartScore}>
-                {prediction.reason === 'recent' ? '🕒' : 
-                 prediction.reason === 'contextual' ? '🎯' : 
-                 prediction.reason === 'newline' ? '📝' : '📊'}
-              </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>

@@ -490,29 +490,26 @@ export default function EditorScreen() {
   };
 
   const moveCursorDown = () => {
-    const minLines = 20;
-    const actualLines = code.split('\n').length;
+    const lines = code.split('\n');
+    const beforeCursor = code.substring(0, cursorPosition);
+    const currentLineIndex = beforeCursor.split('\n').length - 1;
+    const currentLineStart = beforeCursor.lastIndexOf('\n') + 1;
+    const currentColumn = cursorPosition - currentLineStart;
     
-    if (actualLines < minLines) {
-      // If we have fewer lines than minimum, allow adding new lines
-      const currentLineEnd = code.indexOf('\n', cursorPosition);
-      const isAtEndOfCode = cursorPosition >= code.length;
-      
-      if (isAtEndOfCode || currentLineEnd === -1) {
-        // Add a new line and move cursor there
-        const newCode = code + '\n';
-        setCode(newCode);
-        updateHistory(newCode, newCode.length);
-        setCursorPosition(newCode.length);
-        return;
-      }
+    // Check if there's a next line
+    if (currentLineIndex + 1 < lines.length) {
+      // Move to the same column in the next line, or end of line if shorter
+      const nextLine = lines[currentLineIndex + 1];
+      const nextLineStart = code.indexOf('\n', cursorPosition) + 1;
+      const targetColumn = Math.min(currentColumn, nextLine.length);
+      moveCursor(nextLineStart + targetColumn);
+    } else {
+      // No next line exists - create a new line
+      const newCode = code + '\n';
+      setCode(newCode);
+      updateHistory(newCode, newCode.length);
+      moveCursor(newCode.length);
     }
-    
-    // Normal cursor down movement
-    const nextLineStart = code.indexOf('\n', cursorPosition);
-    if (nextLineStart === -1) return;
-    const nextLineEnd = code.indexOf('\n', nextLineStart + 1);
-    moveCursor(nextLineEnd === -1 ? code.length : nextLineEnd);
   };
 
   const moveCursorLeft = () => {

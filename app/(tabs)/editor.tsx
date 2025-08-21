@@ -413,28 +413,20 @@ export default function EditorScreen() {
     const beforeCursor = code.substring(0, cursorPosition);
     const afterCursor = code.substring(cursorPosition);
     const newCode = beforeCursor + insertText + afterCursor;
+    const newCursorPosition = cursorPosition + insertText.length;
+    
     setCode(newCode);
-    updateHistory(newCode, cursorPosition + insertText.length);
-    setCursorPosition(cursorPosition + insertText.length);
+    updateHistory(newCode, newCursorPosition);
     // Check if content has been modified
     setIsModified(newCode !== originalContent);
 
-    // Focus editor and set cursor position
+    // Use the moveCursor function to ensure proper caret tracking
     setTimeout(() => {
       if (editorRef.current) {
         focusFromInsert.current = true;
         editorRef.current.focus();
         Keyboard.dismiss();
-        const start = cursorPosition + insertText.length;
-        const end = start;
-        // For native platforms use setNativeProps, for web fall back to DOM APIs
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const input = editorRef.current as any;
-        if (typeof input.setNativeProps === 'function') {
-          input.setNativeProps({ selection: { start, end } });
-        } else if (typeof input.setSelectionRange === 'function') {
-          input.setSelectionRange(start, end);
-        }
+        moveCursor(newCursorPosition);
         focusFromInsert.current = false;
       }
     }, 100);
@@ -521,6 +513,18 @@ export default function EditorScreen() {
     if (nextLineStart === -1) return;
     const nextLineEnd = code.indexOf('\n', nextLineStart + 1);
     moveCursor(nextLineEnd === -1 ? code.length : nextLineEnd);
+  };
+
+  const moveCursorLeft = () => {
+    if (cursorPosition > 0) {
+      moveCursor(cursorPosition - 1);
+    }
+  };
+
+  const moveCursorRight = () => {
+    if (cursorPosition < code.length) {
+      moveCursor(cursorPosition + 1);
+    }
   };
 
   const handleTextChange = (text: string) => {
@@ -881,6 +885,8 @@ export default function EditorScreen() {
               onDeleteLine={deleteLine}
               onMoveUpLine={moveCursorUp}
               onMoveDownLine={moveCursorDown}
+              onMoveLeftLine={moveCursorLeft}
+              onMoveRightLine={moveCursorRight}
               currentText={code}
               cursorPosition={cursorPosition}
             />

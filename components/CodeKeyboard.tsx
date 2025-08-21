@@ -18,6 +18,8 @@ interface CodeKeyboardProps {
   onDeleteLine?: () => void;
   onMoveUpLine?: () => void;
   onMoveDownLine?: () => void;
+  onMoveLeftLine?: () => void;
+  onMoveRightLine?: () => void;
   currentText?: string;
   cursorPosition?: number;
 }
@@ -112,6 +114,8 @@ export function CodeKeyboard({
   onDeleteLine,
   onMoveUpLine,
   onMoveDownLine,
+  onMoveLeftLine,
+  onMoveRightLine,
   currentText = '',
   cursorPosition = 0,
 }: CodeKeyboardProps) {
@@ -292,15 +296,17 @@ export function CodeKeyboard({
       </ScrollView>
 
       {/* Navigation Keys */}
-      <View style={styles.navigationRow}>
-        <TouchableOpacity style={styles.navButton} onPress={() => onInsert('    ')}>
-          <Text style={styles.navText}>→</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={onDeindent}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.navigationRow}
+        contentContainerStyle={styles.navigationContent}
+      >
+        <TouchableOpacity style={styles.navButton} onPress={onMoveLeftLine}>
           <Text style={styles.navText}>←</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.navButton} onPress={onDeleteLine}>
-          <Text style={styles.navText}>Del</Text>
+        <TouchableOpacity style={styles.navButton} onPress={onMoveRightLine}>
+          <Text style={styles.navText}>→</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.navButton} onPress={onMoveUpLine}>
           <Text style={styles.navText}>↑</Text>
@@ -311,7 +317,16 @@ export function CodeKeyboard({
         <TouchableOpacity style={styles.navButton} onPress={() => onInsert('\n')}>
           <Text style={styles.navText}>↵</Text>
         </TouchableOpacity>
-      </View>
+        <TouchableOpacity style={styles.navButton} onPress={() => onInsert('    ')}>
+          <Text style={styles.navText}>Tab</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navButton} onPress={onDeindent}>
+          <Text style={styles.navText}>⇤</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.navButton} onPress={onDeleteLine}>
+          <Text style={styles.navText}>Del</Text>
+        </TouchableOpacity>
+      </ScrollView>
 
       <KeyboardCustomizer
         isVisible={showCustomizer}
@@ -389,9 +404,11 @@ const styles = StyleSheet.create({
     fontFamily: 'FiraCode-Regular',
   },
   navigationRow: {
+    paddingBottom: 12,
+  },
+  navigationContent: {
     flexDirection: 'row',
     paddingHorizontal: 16,
-    paddingBottom: 12,
     gap: 8,
   },
   navButton: {

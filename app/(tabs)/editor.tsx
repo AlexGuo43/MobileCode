@@ -158,24 +158,15 @@ export default function EditorScreen() {
   };
 
   const handleTemplateClick = (position: number) => {
-    console.log('handleTemplateClick called with position:', position);
-    console.log('Code around position:', code.substring(Math.max(0, position - 10), position + 10));
-    console.log('Current showTemplateRenamer state:', showTemplateRenamer);
-    
     const template = templateService.findTemplateAtPosition(code, position);
-    console.log('Found template:', template);
     
     if (template) {
-      console.log('Setting activeTemplate and showTemplateRenamer to true');
       setActiveTemplate(template);
       setShowTemplateRenamer(true);
-      console.log('Template renamer should now be visible');
     } else {
-      console.log('No template found at position - forcing first template');
       // Force it to work with the first template we know exists
       const allTemplates = templateService.findTemplatesInText(code, 0);
       if (allTemplates.length > 0) {
-        console.log('Using first template:', allTemplates[0]);
         setActiveTemplate(allTemplates[0]);
         setShowTemplateRenamer(true);
       }
@@ -493,16 +484,18 @@ export default function EditorScreen() {
     const lines = code.split('\n');
     const beforeCursor = code.substring(0, cursorPosition);
     const currentLineIndex = beforeCursor.split('\n').length - 1;
-    const currentLineStart = beforeCursor.lastIndexOf('\n') + 1;
-    const currentColumn = cursorPosition - currentLineStart;
     
     // Check if there's a next line
     if (currentLineIndex + 1 < lines.length) {
-      // Move to the same column in the next line, or end of line if shorter
+      // Calculate the start position of the next line
+      let nextLineStart = 0;
+      for (let i = 0; i <= currentLineIndex; i++) {
+        nextLineStart += lines[i].length + 1; // +1 for the newline character
+      }
+      
+      // Move to the end of the next line
       const nextLine = lines[currentLineIndex + 1];
-      const nextLineStart = code.indexOf('\n', cursorPosition) + 1;
-      const targetColumn = Math.min(currentColumn, nextLine.length);
-      moveCursor(nextLineStart + targetColumn);
+      moveCursor(nextLineStart + nextLine.length);
     } else {
       // No next line exists - create a new line
       const newCode = code + '\n';

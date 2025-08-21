@@ -50,8 +50,6 @@ class TemplateService {
   findTemplatesInText(text: string, cursorPosition: number): TemplateMatch[] {
     const matches: TemplateMatch[] = [];
     
-    console.log('Finding templates in text:', text.substring(0, 100) + '...');
-    
     for (const [type, pattern] of Object.entries(this.TEMPLATE_PATTERNS)) {
       let match;
       const regex = new RegExp(pattern.source, pattern.flags);
@@ -60,8 +58,6 @@ class TemplateService {
         const placeholder = match[0];
         const start = match.index;
         const end = start + placeholder.length;
-        
-        console.log('Found template:', placeholder, 'at position', start, '-', end);
         
         matches.push({
           placeholder,
@@ -72,7 +68,6 @@ class TemplateService {
       }
     }
     
-    console.log('Total templates found:', matches.length);
     return matches.sort((a, b) => a.start - b.start);
   }
 

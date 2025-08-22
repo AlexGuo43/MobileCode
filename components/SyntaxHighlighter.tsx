@@ -56,7 +56,7 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
           currentToken = char;
         } else if (inString || inComment) {
           currentToken += char;
-        } else if (/\s/.test(char)) {
+        } else if (/\s/.test(char) || /[()[\]{},.:;=+\-*/<>!&|]/.test(char)) {
           if (currentToken) {
             const tokenType = keywords.includes(currentToken) ? 'keyword' :
                             builtins.includes(currentToken) ? 'builtin' :

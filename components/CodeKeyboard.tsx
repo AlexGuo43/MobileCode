@@ -199,7 +199,8 @@ export function CodeKeyboard({
   const handleSmartInsert = async (button: KeyboardButton) => {
     const context = getTypingContext();
     await smartKeyboardService.recordButtonUsage(button, context);
-    onInsert(button.text);
+    const smartText = smartKeyboardService.getSmartButtonText(button, context);
+    onInsert(smartText);
   };
 
   const handleCustomizerSave = (newTabs: KeyboardTab[]) => {

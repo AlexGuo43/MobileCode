@@ -41,26 +41,26 @@ class SmartKeyboardService {
   }
 
   async recordButtonUsage(button: KeyboardButton, context: TypingContext): Promise<void> {
-    const contextString = this.contextToString(context);
-    const existing = this.usageData.get(button.id);
-    
-    if (existing) {
-      existing.count += 1;
-      existing.lastUsed = Date.now();
-      existing.contexts.unshift(contextString);
-      if (existing.contexts.length > this.MAX_CONTEXTS_PER_BUTTON) {
-        existing.contexts = existing.contexts.slice(0, this.MAX_CONTEXTS_PER_BUTTON);
-      }
-    } else {
-      this.usageData.set(button.id, {
-        buttonId: button.id,
-        count: 1,
-        lastUsed: Date.now(),
-        contexts: [contextString],
-      });
-    }
+    // No longer recording usage data since we removed frequency-based suggestions
+    // This keeps the function signature intact but removes the storage overhead
+  }
 
-    await this.saveUsageData();
+  // Get smart text for a button based on context
+  getSmartButtonText(button: KeyboardButton, context: TypingContext): string {
+    // Smart colon handling for control flow statements
+    if (button.label === ':') {
+      const currentLine = context.currentLine.toLowerCase();
+      
+      // Check if this is a control flow statement that needs indentation
+      const isControlFlow = /\b(for|if|elif|else|while|def|class|try|except|finally|with)\b/.test(currentLine);
+      
+      if (isControlFlow) {
+        return ':\n    '; // Colon + newline + 4 spaces indentation
+      }
+    }
+    
+    // Default to the button's original text
+    return button.text;
   }
 
   getSmartPredictions(
@@ -76,19 +76,18 @@ class SmartKeyboardService {
       }
     }
     const predictions: SmartPrediction[] = [];
-    const now = Date.now();
 
     for (const button of allButtons) {
       let score = 0;
-      let reason: SmartPrediction['reason'] = 'frequency';
+      let reason: SmartPrediction['reason'] = 'contextual';
 
       // Priority 1: Contextual sequences (highest priority)
       const sequenceScore = this.getSequenceScore(button, context);
       if (sequenceScore > 0) {
-        score = sequenceScore * 2; // Boost contextual matches
+        score = sequenceScore;
         reason = 'contextual';
       }
-      // Priority 2: New line suggestions (only if no contextual match)
+      // Priority 2: New line suggestions (only if no contextual match and on new line)
       else if (context.isNewLine) {
         const newLineScore = this.getNewLineScore(button);
         if (newLineScore > 0) {
@@ -96,17 +95,7 @@ class SmartKeyboardService {
           reason = 'newline';
         }
       }
-      // Priority 3: Recent usage (only if not inline and no better match)
-      else if (!this.isInlineContext(context)) {
-        const usage = this.usageData.get(button.id);
-        if (usage) {
-          const recencyScore = this.getRecencyScore(usage.lastUsed, now);
-          if (recencyScore > 0.5) { // Only very recent usage
-            score = recencyScore * 0.3; // Lower than contextual
-            reason = 'recent';
-          }
-        }
-      }
+      // No more frequency/recent usage suggestions - they add noise
 
       if (score > 0) {
         predictions.push({ button, score, reason });
@@ -119,7 +108,7 @@ class SmartKeyboardService {
   }
 
   private getNewLineScore(button: KeyboardButton): number {
-    const commonStarters = {
+    const commonStarters: Record<string, number> = {
       'if': 0.9,
       'for': 0.8,
       'while': 0.7,
@@ -136,23 +125,7 @@ class SmartKeyboardService {
     return commonStarters[button.label.toLowerCase()] || 0;
   }
 
-  private getRecencyScore(lastUsed: number, now: number): number {
-    const daysDiff = (now - lastUsed) / (1000 * 60 * 60 * 24);
-    return Math.max(0, Math.pow(this.DECAY_FACTOR, daysDiff));
-  }
-
-  private getContextScore(contexts: string[], currentContext: TypingContext): number {
-    const currentContextString = this.contextToString(currentContext);
-    let score = 0;
-
-    for (const context of contexts) {
-      if (this.contextSimilarity(context, currentContextString) > 0.7) {
-        score += 0.3;
-      }
-    }
-
-    return Math.min(score, 1.0);
-  }
+  // Removed unused frequency-based scoring functions
 
   private getSequenceScore(button: KeyboardButton, context: TypingContext): number {
     const currentLine = context.currentLine.toLowerCase();
@@ -164,6 +137,11 @@ class SmartKeyboardService {
     
     // Fallback to simple last word sequences
     if (!context.lastWord) return 0;
+    
+    // Don't suggest var operations when inside function calls
+    if (context.lastWord.toLowerCase() === 'var' && /\w+\([^)]*$/.test(currentLine)) {
+      return 0; // Don't suggest var operations inside function calls
+    }
     
     const sequences = this.getCommonSequences();
     const lastWord = context.lastWord.toLowerCase().trim();
@@ -204,13 +182,13 @@ class SmartKeyboardService {
       }
     }
 
-    if (currentLine.includes('for ') && currentLine.includes(' in ') && !currentLine.includes('range(')) {
-      if (currentLine.match(/for\s+\w+\s+in\s*$/) && buttonLabel === 'range') {
-        return 1.0; // Perfect: "for i in" + "range"
+    if (currentLine.includes('for ') && currentLine.includes(' in ') && !currentLine.includes('(')) {
+      if (currentLine.match(/for\s+\w+\s+in\s*$/) && ['range', 'enumerate', 'zip'].includes(buttonLabel)) {
+        return 1.0; // Perfect: "for i in" + iterable function
       }
     }
 
-    // Range function parameters
+    // Iterable function parameters (range, enumerate, zip)
     if (currentLine.includes('range(')) {
       // Check if we're inside range() and need parameters
       if (currentLine.match(/range\(\s*$/) && ['10', '0', '1', 'len'].includes(buttonLabel)) {
@@ -219,6 +197,28 @@ class SmartKeyboardService {
       // Check if we need to close range parentheses
       if (hasUnmatchedParens(currentLine) && currentLine.includes('range(') && buttonLabel === ')') {
         return 1.0; // Perfect: close range parenthesis
+      }
+    }
+
+    if (currentLine.includes('enumerate(')) {
+      // Check if we're inside enumerate() and need parameters
+      if (currentLine.match(/enumerate\(\s*$/) && ['var', 'list', 'arr'].includes(buttonLabel)) {
+        return 0.9; // Good: "enumerate(" + iterable
+      }
+      // Check if we need to close enumerate parentheses
+      if (hasUnmatchedParens(currentLine) && currentLine.includes('enumerate(') && buttonLabel === ')') {
+        return 1.0; // Perfect: close enumerate parenthesis
+      }
+    }
+
+    if (currentLine.includes('zip(')) {
+      // Check if we're inside zip() and need parameters
+      if (currentLine.match(/zip\(\s*$/) && ['var', 'list', 'arr'].includes(buttonLabel)) {
+        return 0.9; // Good: "zip(" + iterable
+      }
+      // Check if we need to close zip parentheses
+      if (hasUnmatchedParens(currentLine) && currentLine.includes('zip(') && buttonLabel === ')') {
+        return 1.0; // Perfect: close zip parenthesis
       }
     }
 
@@ -234,9 +234,9 @@ class SmartKeyboardService {
       }
     }
 
-    // After complete range() or len(), suggest colon for for-loops
+    // After complete iterable function calls, suggest colon for for-loops
     if (currentLine.includes('for ') && !hasUnmatchedParens(currentLine) && !currentLine.includes(':')) {
-      if ((currentLine.includes('range(') || currentLine.includes('len(')) && buttonLabel === ':') {
+      if ((currentLine.includes('range(') || currentLine.includes('len(') || currentLine.includes('enumerate(') || currentLine.includes('zip(')) && buttonLabel === ':') {
         return 1.0; // Perfect: complete for loop + ":"
       }
     }
@@ -269,8 +269,9 @@ class SmartKeyboardService {
       }
     }
 
-    // Function name completion
-    if (['print', 'len', 'int', 'str', 'input'].some(fn => currentLine.endsWith(fn))) {
+    // Function name completion - expanded list
+    const functionNames = ['print', 'len', 'int', 'str', 'input', 'range', 'enumerate', 'zip', 'list', 'dict', 'set', 'tuple', 'type', 'bool', 'float', 'open', 'max', 'min', 'sum', 'abs', 'round', 'sorted', 'reversed'];
+    if (functionNames.some(fn => currentLine.endsWith(fn))) {
       if (buttonLabel === '(') {
         return 1.0; // Perfect: function + "("
       }
@@ -294,57 +295,126 @@ class SmartKeyboardService {
 
   private getCommonSequences(): Record<string, string[]> {
     return {
-      'for': ['i', 'var', 'range', 'enumerate'],
+      // Control flow
+      'for': ['i', 'var'],
       'i': ['in'],
-      'var': ['in', '='],
-      'if': ['condition'],
-      'elif': ['condition'],
-      'while': ['condition'],
-      'condition': [':'],
-      'print': ['('],
+      'var': ['in', '=', '+', '-', '*', '/', '%', '==', '!=', '<', '>', '<=', '>='],
+      'if': ['condition', 'var'],
+      'elif': ['condition', 'var'],
+      'else': [':'],
+      'while': ['condition', 'var'],
+      'condition': [':', '==', '!=', '<', '>', '<=', '>=', 'and', 'or', 'not'],
+      'try': [':'],
+      'except': [':', 'Exception'],
+      'finally': [':'],
+      'with': ['open'],
+      'break': [],
+      'continue': [],
+      'pass': [],
+      'return': ['var', '0', '1', 'None', 'True', 'False', '[', '{', '('],
+
+      // Iterables and containers
+      'in': ['range', 'enumerate', 'zip', '[]', '{}', 'var'],
+      'range': ['('],
+      'enumerate': ['('],
+      'zip': ['('],
+      'len': ['('],
+      
+      // Functions and classes
       'def': ['function'],
       'function': ['('],
       'class': ['ClassName'],
-      'import': ['module'],
-      'from': ['module'],
-      '=': ['0', '1', '[', '{', '(', 'input', 'int', 'str', '"', "'", 'var'],
-      'range': ['('],
-      'len': ['('],
-      'enumerate': ['('],
+      'lambda': ['var'],
+      
+      // I/O and built-ins
+      'print': ['('],
+      'input': ['('],
+      'open': ['('],
+      
+      // Type constructors
       'int': ['('],
       'str': ['('],
+      'float': ['('],
+      'bool': ['('],
       'list': ['('],
       'dict': ['('],
-      'in': ['range', '[]', '{}'],
-      '==': ['0', '1', 'true', 'false', 'none', 'var'],
-      '!=': ['0', '1', 'true', 'false', 'none', 'var'],
+      'set': ['('],
+      'tuple': ['('],
+      'type': ['('],
+      
+      // Imports
+      'import': ['module', 'os', 'sys', 'math', 'random', 'json', 'datetime'],
+      'from': ['module', 'os', 'sys', 'math', 'random', 'json', 'datetime'],
+      'as': ['var'],
+      
+      // Operators and comparisons
+      '=': ['0', '1', '[', '{', '(', 'input', 'int', 'str', 'float', 'bool', '"', "'", 'var', 'None', 'True', 'False'],
+      '+=': ['1', '0', 'var'],
+      '-=': ['1', '0', 'var'],
+      '*=': ['2', '0', 'var'],
+      '/=': ['2', '0', 'var'],
+      '==': ['0', '1', 'None', 'True', 'False', 'var', '"', "'"],
+      '!=': ['0', '1', 'None', 'True', 'False', 'var', '"', "'"],
+      '<': ['0', '1', 'len', 'var'],
+      '>': ['0', '1', 'len', 'var'],
+      '<=': ['0', '1', 'len', 'var'],
+      '>=': ['0', '1', 'len', 'var'],
+      
+      // Logical operators
+      'and': ['var', 'not'],
+      'or': ['var', 'not'],
+      'not': ['var', 'in'],
+      'is': ['None', 'True', 'False', 'not'],
+      
+      // String operations
+      '"': ['+', ',', ')', ']', '}'],
+      "'": ['+', ',', ')', ']', '}'],
+      
+      // Container operations
+      '[': [']', '0', '1', 'var', '"', "'"],
+      '{': ['}', '"', "'", 'var'],
+      '(': [')', 'var', '0', '1', '"', "'"],
+      
+      // Common methods (would be triggered by dot notation in real implementation)
+      'append': ['('],
+      'extend': ['('],
+      'insert': ['('],
+      'remove': ['('],
+      'pop': ['('],
+      'index': ['('],
+      'count': ['('],
+      'sort': ['('],
+      'reverse': ['('],
+      'split': ['('],
+      'join': ['('],
+      'replace': ['('],
+      'strip': ['('],
+      'upper': ['('],
+      'lower': ['('],
+      'find': ['('],
+      'startswith': ['('],
+      'endswith': ['('],
+      
+      // Exception handling
+      'Exception': ['('],
+      'ValueError': ['('],
+      'TypeError': ['('],
+      'IndexError': ['('],
+      'KeyError': ['('],
+      
+      // Common patterns
+      'True': [],
+      'False': [],
+      'None': [],
+      'self': ['.', '[', '='],
+      '__init__': ['('],
+      '__str__': ['('],
+      '__repr__': ['('],
+      '__len__': ['('],
     };
   }
 
-  private contextToString(context: TypingContext): string {
-    return `${context.lastWord}|${context.isNewLine ? 'newline' : 'inline'}|${context.lineIndentation}`;
-  }
-
-  private contextSimilarity(context1: string, context2: string): number {
-    const parts1 = context1.split('|');
-    const parts2 = context2.split('|');
-    
-    let similarity = 0;
-    if (parts1[0] === parts2[0]) similarity += 0.5; // same last word
-    if (parts1[1] === parts2[1]) similarity += 0.3; // same line type
-    if (Math.abs(parseInt(parts1[2]) - parseInt(parts2[2])) <= 1) similarity += 0.2; // similar indentation
-    
-    return similarity;
-  }
-
-  private async saveUsageData(): Promise<void> {
-    try {
-      const data = Object.fromEntries(this.usageData);
-      await storage.setItem(this.STORAGE_KEY, JSON.stringify(data));
-    } catch (error) {
-      console.error('Failed to save smart keyboard data:', error);
-    }
-  }
+  // Removed unused context similarity and storage functions
 
   async clearData(): Promise<void> {
     this.usageData.clear();

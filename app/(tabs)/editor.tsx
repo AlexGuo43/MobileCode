@@ -12,6 +12,7 @@ import {
   TouchableWithoutFeedback,
   Linking,
   Alert,
+  Share,
 } from 'react-native';
 import Animated, {
   useSharedValue,
@@ -30,6 +31,7 @@ import {
   Plus,
   ChevronDown,
   ExternalLink,
+  Copy,
 } from 'lucide-react-native';
 import { CodeKeyboard } from '@/components/CodeKeyboard';
 import { SyntaxHighlighter } from '@/components/SyntaxHighlighter';
@@ -37,6 +39,7 @@ import { TerminalPanel } from '@/components/TerminalPanel';
 import { TemplateRenamer } from '@/components/TemplateRenamer';
 import { templateService, TemplateMatch } from '@/utils/templateSystem';
 import { syncService } from '@/services/syncService';
+// No clipboard import needed - using React Native's built-in method
 import { authService } from '@/services/authService';
 
 const { height: screenHeight } = Dimensions.get('window');
@@ -556,6 +559,17 @@ export default function EditorScreen() {
     }, 100);
   };
 
+  const copyCode = async () => {
+    try {
+      await Share.share({
+        message: code,
+        title: 'Code from Mobile Code Editor',
+      });
+    } catch (error) {
+      Alert.alert('Error', 'Could not share code. Try selecting and copying the text manually.');
+    }
+  };
+
   const saveFile = async () => {
     try {
       if (fileUri) {
@@ -706,6 +720,9 @@ export default function EditorScreen() {
                 )}
                 <TouchableOpacity style={styles.actionButton} onPress={saveFile}>
                   <Save size={16} color="#007AFF" />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionButton} onPress={copyCode}>
+                  <Copy size={16} color="#007AFF" />
                 </TouchableOpacity>
                 <TouchableOpacity style={styles.actionButton} onPress={undo}>
                   <Undo size={16} color="#007AFF" />

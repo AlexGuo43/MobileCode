@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -28,6 +28,7 @@ export function TemplateRenamer({
 }: TemplateRenamerProps) {
   const [currentValue, setCurrentValue] = useState('');
   const [suggestions, setSuggestions] = useState<string[]>([]);
+  const inputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     if (template) {
@@ -47,10 +48,18 @@ export function TemplateRenamer({
 
   const handleSuggestionPress = (suggestion: string) => {
     setCurrentValue(suggestion);
+    // Keep focus on the input to prevent keyboard dismissal
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
   };
 
   const insertText = (text: string) => {
     setCurrentValue(prev => prev + text);
+    // Keep focus on the input to prevent keyboard dismissal
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
   };
 
   if (!template) return null;
@@ -81,6 +90,7 @@ export function TemplateRenamer({
           {/* Current Value Input */}
           <View style={styles.inputContainer}>
             <TextInput
+              ref={inputRef}
               style={styles.input}
               value={currentValue}
               onChangeText={setCurrentValue}
@@ -98,6 +108,7 @@ export function TemplateRenamer({
             showsHorizontalScrollIndicator={false}
             style={styles.suggestionsContainer}
             contentContainerStyle={styles.suggestionsContent}
+            keyboardShouldPersistTaps="handled"
           >
             {suggestions.map((suggestion, index) => (
               <TouchableOpacity
@@ -117,6 +128,7 @@ export function TemplateRenamer({
             showsHorizontalScrollIndicator={false}
             style={styles.quickInsertContainer}
             contentContainerStyle={styles.quickInsertContent}
+            keyboardShouldPersistTaps="handled"
           >
             {getQuickInsertButtons(template.type).map((button, index) => (
               <TouchableOpacity

@@ -64,7 +64,13 @@ const defaultTabs: KeyboardTab[] = [
       { id: '33', label: 'class', text: 'class ClassName:\n    def __init__(self):\n        ' },
       { id: '34', label: 'import', text: 'import ' },
       { id: '35', label: 'from', text: 'from module import ' },
-      { id: '36', label: 'var', text: 'var = ' },
+      { id: '36', label: 'var', text: 'var' },
+      { id: '68', label: ':', text: ':' },
+      { id: '69', label: '10', text: '10' },
+      { id: '70', label: '1', text: '1' },
+      { id: '71', label: 'arr', text: 'arr' },
+      { id: '72', label: 'nums', text: 'nums' },
+      { id: '73', label: 'list', text: 'list' },
     ],
   },
   {
@@ -140,7 +146,20 @@ export function CodeKeyboard({
     try {
       const savedTabs = await storage.getItem('customKeyboardTabs');
       if (savedTabs) {
-        setTabs(JSON.parse(savedTabs));
+        const parsedTabs = JSON.parse(savedTabs);
+        // Migrate old 'var = ' to new 'var' format
+        const migratedTabs = parsedTabs.map((tab: KeyboardTab) => ({
+          ...tab,
+          data: tab.data.map((button: KeyboardButton) => {
+            if (button.id === '36' && button.label === 'var' && button.text === 'var = ') {
+              return { ...button, text: 'var' };
+            }
+            return button;
+          })
+        }));
+        setTabs(migratedTabs);
+        // Save the migrated version
+        await storage.setItem('customKeyboardTabs', JSON.stringify(migratedTabs));
       }
     } catch (error) {
       console.error('Failed to load custom keyboard tabs:', error);
@@ -244,7 +263,7 @@ export function CodeKeyboard({
           style={styles.smartRow}
           contentContainerStyle={styles.keyboardContent}
         >
-          {smartPredictions.map((prediction, index) => (
+          {smartPredictions.map((prediction) => (
             <TouchableOpacity
               key={`smart-${prediction.button.id}`}
               style={[styles.keyButton, styles.smartButton]}
@@ -263,7 +282,7 @@ export function CodeKeyboard({
         style={[styles.keyboardRow, styles.firstRow]}
         contentContainerStyle={styles.keyboardContent}
       >
-        {firstRow.map((item, index) => (
+        {firstRow.map((item) => (
           <TouchableOpacity
             key={item.id}
             style={styles.keyButton}
@@ -279,7 +298,7 @@ export function CodeKeyboard({
         style={[styles.keyboardRow, styles.secondRow]}
         contentContainerStyle={styles.keyboardContent}
       >
-        {secondRow.map((item, index) => (
+        {secondRow.map((item) => (
           <TouchableOpacity
             key={item.id}
             style={styles.keyButton}

@@ -1,5 +1,6 @@
 import { storage } from './storage';
 import { KeyboardButton } from '../components/KeyboardCustomizer';
+import { templateService } from './templateSystem';
 
 interface TypingContext {
   lastWord: string;
@@ -154,6 +155,14 @@ class SmartKeyboardService {
   }
 
   private getSequenceScore(button: KeyboardButton, context: TypingContext): number {
+    const currentLine = context.currentLine.toLowerCase();
+    const buttonLabel = button.label.toLowerCase();
+    
+    // Enhanced context-aware sequence scoring
+    const score = this.getContextualScore(currentLine, buttonLabel);
+    if (score > 0) return score;
+    
+    // Fallback to simple last word sequences
     if (!context.lastWord) return 0;
     
     const sequences = this.getCommonSequences();
@@ -161,7 +170,6 @@ class SmartKeyboardService {
     
     if (sequences[lastWord]) {
       const expectedNext = sequences[lastWord];
-      const buttonLabel = button.label.toLowerCase();
       
       if (expectedNext.includes(buttonLabel)) {
         const index = expectedNext.indexOf(buttonLabel);
@@ -169,6 +177,112 @@ class SmartKeyboardService {
       }
     }
     
+    return 0;
+  }
+
+  private getContextualScore(currentLine: string, buttonLabel: string): number {
+    // Helper function to check if parentheses are balanced
+    const hasUnmatchedParens = (text: string): boolean => {
+      let count = 0;
+      for (const char of text) {
+        if (char === '(') count++;
+        if (char === ')') count--;
+      }
+      return count > 0;
+    };
+
+    // For loop progression: for -> var/i -> in -> range( -> var -> ) -> :
+    if (currentLine.includes('for ') && !currentLine.includes(' in ')) {
+      if (currentLine.match(/for\s+\w+\s*$/) && buttonLabel === 'in') {
+        return 1.0; // Perfect match: "for i" + "in"
+      }
+      if (currentLine.match(/for\s*$/) && buttonLabel === 'i') {
+        return 1.0; // Perfect match: "for" + "i" (most common)
+      }
+      if (currentLine.match(/for\s*$/) && buttonLabel === 'var') {
+        return 0.9; // Good match: "for" + template variable
+      }
+    }
+
+    if (currentLine.includes('for ') && currentLine.includes(' in ') && !currentLine.includes('range(')) {
+      if (currentLine.match(/for\s+\w+\s+in\s*$/) && buttonLabel === 'range') {
+        return 1.0; // Perfect: "for i in" + "range"
+      }
+    }
+
+    // Range function parameters
+    if (currentLine.includes('range(')) {
+      // Check if we're inside range() and need parameters
+      if (currentLine.match(/range\(\s*$/) && ['10', '0', '1', 'len'].includes(buttonLabel)) {
+        return 0.9; // Good: "range(" + number or len
+      }
+      // Check if we need to close range parentheses
+      if (hasUnmatchedParens(currentLine) && currentLine.includes('range(') && buttonLabel === ')') {
+        return 1.0; // Perfect: close range parenthesis
+      }
+    }
+
+    // len() function parameters
+    if (currentLine.includes('len(')) {
+      // Check if we're inside len() and need parameters  
+      if (currentLine.match(/len\(\s*$/) && buttonLabel === 'var') {
+        return 1.0; // Perfect: "len(" + template variable
+      }
+      // Check if we need to close len parentheses
+      if (hasUnmatchedParens(currentLine) && currentLine.includes('len(') && buttonLabel === ')') {
+        return 1.0; // Perfect: close len parenthesis
+      }
+    }
+
+    // After complete range() or len(), suggest colon for for-loops
+    if (currentLine.includes('for ') && !hasUnmatchedParens(currentLine) && !currentLine.includes(':')) {
+      if ((currentLine.includes('range(') || currentLine.includes('len(')) && buttonLabel === ':') {
+        return 1.0; // Perfect: complete for loop + ":"
+      }
+    }
+
+    // If statement progression: if -> condition -> :
+    if (currentLine.includes('if ') && !currentLine.includes(':')) {
+      if (currentLine.match(/if\s*$/) && buttonLabel === 'condition') {
+        return 1.0; // Perfect: "if" + template condition
+      }
+      if (currentLine.match(/if\s+[^:]+$/) && !hasUnmatchedParens(currentLine) && buttonLabel === ':') {
+        return 1.0; // Perfect: complete if condition + ":"
+      }
+    }
+
+    // General function call progression: function -> ( -> params -> )
+    const functionPattern = /\b(print|int|str|input)\(/;
+    if (functionPattern.test(currentLine)) {
+      const match = currentLine.match(/\b(print|int|str|input)\(/);
+      if (match) {
+        const afterFunction = currentLine.substring(currentLine.indexOf(match[0]) + match[0].length);
+        
+        // If just opened function call, suggest parameters
+        if (afterFunction.trim() === '' && buttonLabel === 'var') {
+          return 0.9; // Good: function parameters with template
+        }
+        // If function has parameters, suggest closing
+        if (hasUnmatchedParens(currentLine) && buttonLabel === ')') {
+          return 0.9; // Good: close function call
+        }
+      }
+    }
+
+    // Function name completion
+    if (['print', 'len', 'int', 'str', 'input'].some(fn => currentLine.endsWith(fn))) {
+      if (buttonLabel === '(') {
+        return 1.0; // Perfect: function + "("
+      }
+    }
+
+    // Assignment progression: var = value
+    if (currentLine.includes('=') && !currentLine.includes('==')) {
+      if (currentLine.match(/=\s*$/) && ['0', '1', '[', '{', '(', 'input', 'int', 'str', '"', "'"].includes(buttonLabel)) {
+        return 0.9; // Good: assignment + value
+      }
+    }
+
     return 0;
   }
 
@@ -180,21 +294,20 @@ class SmartKeyboardService {
 
   private getCommonSequences(): Record<string, string[]> {
     return {
-      'for': ['i', 'num', 'x', 'c', 'range', 'enumerate'],
+      'for': ['i', 'var', 'range', 'enumerate'],
       'i': ['in'],
-      'num': ['in'],
-      'x': ['in'],
-      'c': ['in'],
-      'item': ['in'],
-      'if': ['(', 'x', 'num', 'i', 'not'],
-      'elif': ['(', 'x', 'num', 'i', 'not'],
-      'while': ['(', 'x', 'num', 'i', 'true'],
+      'var': ['in', '='],
+      'if': ['condition'],
+      'elif': ['condition'],
+      'while': ['condition'],
+      'condition': [':'],
       'print': ['('],
-      'def': ['('],
-      'class': ['('],
-      'import': ['os', 'sys', 'math', 'random'],
-      'from': ['collections', 'itertools'],
-      '=': ['0', '1', '[', '{', '(', 'input', 'int', 'str', '"', "'"],
+      'def': ['function'],
+      'function': ['('],
+      'class': ['ClassName'],
+      'import': ['module'],
+      'from': ['module'],
+      '=': ['0', '1', '[', '{', '(', 'input', 'int', 'str', '"', "'", 'var'],
       'range': ['('],
       'len': ['('],
       'enumerate': ['('],
@@ -203,8 +316,8 @@ class SmartKeyboardService {
       'list': ['('],
       'dict': ['('],
       'in': ['range', '[]', '{}'],
-      '==': ['0', '1', 'true', 'false', 'none'],
-      '!=': ['0', '1', 'true', 'false', 'none'],
+      '==': ['0', '1', 'true', 'false', 'none', 'var'],
+      '!=': ['0', '1', 'true', 'false', 'none', 'var'],
     };
   }
 

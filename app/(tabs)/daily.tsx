@@ -123,7 +123,7 @@ function IframeRenderer({ url }: { url: string }) {
   return (
     <View style={styles.iframeContainer}>
       <View style={styles.iframeHeader}>
-        <Text style={styles.iframeLabel}>Interactive Content:</Text>
+        <Text style={styles.iframeLabel}></Text>
         <TouchableOpacity style={styles.openBrowserButton} onPress={openInBrowser}>
           <Text style={styles.openBrowserText}>Open in Browser</Text>
         </TouchableOpacity>
@@ -167,6 +167,14 @@ function SolutionRenderer({ content, iframes }: { content: string, iframes: stri
                 fontSize: 14,
                 lineHeight: 20,
                 fontFamily: 'FiraCode-Regular',
+              }}
+              renderersProps={{
+                img: {
+                  enableExperimentalPercentWidth: true,
+                },
+              }}
+              defaultTextProps={{
+                selectable: false,
               }}
             />
           );
@@ -390,6 +398,7 @@ export default function DailyChallengeScreen() {
         {activeTab === 'problem' ? (
           isHtml(description) ? (
             <RenderHTML
+              key="problem-description"
               contentWidth={width}
               source={{ html: description }}
               baseStyle={{
@@ -397,6 +406,14 @@ export default function DailyChallengeScreen() {
                 fontSize: 14,
                 lineHeight: 20,
                 fontFamily: 'FiraCode-Regular',
+              }}
+              renderersProps={{
+                img: {
+                  enableExperimentalPercentWidth: true,
+                },
+              }}
+              defaultTextProps={{
+                selectable: false,
               }}
             />
           ) : (

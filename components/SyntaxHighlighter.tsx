@@ -92,8 +92,8 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
             }
             
             // Check if this token text is a template placeholder
-            const cleanToken = token.text.replace(/[^\w]/g, '').trim(); // Remove punctuation
-            const isTemplate = ['function', 'condition', 'ClassName', 'module', 'var'].includes(cleanToken);
+            const cleanToken = token.text.replace(/[^\w]/g, '').trim().toLowerCase(); // Remove punctuation and normalize case
+            const isTemplate = ['function', 'condition', 'classname', 'module', 'var'].includes(cleanToken);
             
             // Just highlight templates, use button for interaction
             if (isTemplate) {

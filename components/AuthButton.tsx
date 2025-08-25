@@ -57,14 +57,46 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
     setName('');
   };
 
-  const handleAuth = async () => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('Error', 'Please fill in all required fields.');
-      return;
+  const validateFields = (): string | null => {
+    // Check if all fields are filled
+    if (!email.trim()) {
+      return 'Email is required.';
+    }
+    if (!password.trim()) {
+      return 'Password is required.';
+    }
+    if (authMode === 'register' && !name.trim()) {
+      return 'Name is required.';
     }
 
-    if (authMode === 'register' && !name.trim()) {
-      Alert.alert('Error', 'Please enter your name.');
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      return 'Please enter a valid email address.';
+    }
+
+    // Password validation
+    if (password.length < 8) {
+      return 'Password must be at least 8 characters long.';
+    }
+
+    // Name validation (for registration)
+    if (authMode === 'register') {
+      if (name.trim().length < 1) {
+        return 'Name cannot be empty.';
+      }
+      if (name.trim().length > 100) {
+        return 'Name must be 100 characters or less.';
+      }
+    }
+
+    return null; // All validations passed
+  };
+
+  const handleAuth = async () => {
+    const validationError = validateFields();
+    if (validationError) {
+      Alert.alert('Validation Error', validationError);
       return;
     }
 

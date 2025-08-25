@@ -58,6 +58,13 @@ class SyncService {
 
   async uploadFile(localFilePath: string, filename: string): Promise<boolean> {
     try {
+      // Check if user is authenticated first
+      const token = await authService.getAccessToken();
+      if (!token) {
+        console.warn('Cannot upload file: User not authenticated');
+        return false;
+      }
+
       const content = await FileSystem.readAsStringAsync(localFilePath);
       const fileStats = await FileSystem.getInfoAsync(localFilePath);
       const fileType = this.getFileTypeFromFilename(filename);
@@ -137,6 +144,12 @@ class SyncService {
     const results: SyncResults = { success: 0, failed: 0, conflicts: 0 };
     
     try {
+      // Check if user is authenticated first
+      const token = await authService.getAccessToken();
+      if (!token) {
+        console.warn('Cannot sync files: User not authenticated');
+        return results;
+      }
       const ROOT_DIR = FileSystem.documentDirectory + 'files/';
       
       // Ensure directory exists
@@ -232,6 +245,13 @@ class SyncService {
 
   async getRemoteFiles(): Promise<SyncFile[]> {
     try {
+      // Check if user is authenticated first
+      const token = await authService.getAccessToken();
+      if (!token) {
+        console.warn('Cannot get remote files: User not authenticated');
+        return [];
+      }
+
       const headers = await this.getAuthHeaders();
       const response = await fetch(`${API_BASE_URL}/sync/files`, {
         headers,
@@ -251,6 +271,13 @@ class SyncService {
 
   async deleteFile(filename: string): Promise<boolean> {
     try {
+      // Check if user is authenticated first
+      const token = await authService.getAccessToken();
+      if (!token) {
+        console.warn('Cannot delete file: User not authenticated');
+        return false;
+      }
+
       const headers = await this.getAuthHeaders();
       const response = await fetch(`${API_BASE_URL}/sync/files/${encodeURIComponent(filename)}`, {
         method: 'DELETE',
@@ -274,6 +301,13 @@ class SyncService {
 
   async getStorageInfo(): Promise<StorageInfo | null> {
     try {
+      // Check if user is authenticated first
+      const token = await authService.getAccessToken();
+      if (!token) {
+        console.warn('Cannot get storage info: User not authenticated');
+        return null;
+      }
+
       const headers = await this.getAuthHeaders();
       const response = await fetch(`${API_BASE_URL}/sync/storage`, {
         headers,

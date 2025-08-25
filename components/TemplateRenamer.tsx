@@ -195,6 +195,8 @@ function getQuickInsertButtons(type: TemplateMatch['type']) {
         { label: '[', text: '[' },
         { label: ']', text: ']' },
         { label: 'i', text: 'i' },
+        { label: '.append()', text: '.append()' },
+        { label: '.pop()', text: '.pop()' },
         { label: 'data', text: 'data' },
         { label: 'result', text: 'result' },
         { label: 'value', text: 'value' },

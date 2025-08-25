@@ -192,6 +192,9 @@ function getQuickInsertButtons(type: TemplateMatch['type']) {
       ];
     case 'variable':
       return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: 'i', text: 'i' },
         { label: 'data', text: 'data' },
         { label: 'result', text: 'result' },
         { label: 'value', text: 'value' },

@@ -135,6 +135,17 @@ class SmartKeyboardService {
     const score = this.getContextualScore(currentLine, buttonLabel);
     if (score > 0) return score;
     
+    // Check if the last operator was =, +=, -=, etc.
+    const operatorMatch = currentLine.match(/[+\-*/%]?=\s*$/);
+    if (operatorMatch) {
+      const operator = operatorMatch[0].trim();
+      const sequences = this.getCommonSequences();
+      if (sequences[operator] && sequences[operator].includes(buttonLabel)) {
+        const index = sequences[operator].indexOf(buttonLabel);
+        return 1.0 - (index * 0.1); // Higher score for earlier matches
+      }
+    }
+    
     // Fallback to simple last word sequences
     if (!context.lastWord) return 0;
     
@@ -298,7 +309,7 @@ class SmartKeyboardService {
       // Control flow
       'for': ['i', 'var'],
       'i': ['in'],
-      'var': ['in', '=', '+', '-', '*', '/', '%', '==', '!=', '<', '>', '<=', '>='],
+      'var': ['in', '=', '+', '-', '*', '/', '%', '<', '>', '<=', '>='],
       'if': ['condition', 'var'],
       'elif': ['condition', 'var'],
       'else': [':'],
@@ -348,7 +359,7 @@ class SmartKeyboardService {
       'as': ['var'],
       
       // Operators and comparisons
-      '=': ['0', '1', '[', '{', '(', 'input', 'int', 'str', 'float', 'bool', '"', "'", 'var', 'None', 'True', 'False'],
+      '=': ['var', '0', '1', '[', '{', '(', 'input', 'int', 'str', 'float', 'bool', '"', "'", 'None', 'True', 'False'],
       '+=': ['1', '0', 'var'],
       '-=': ['1', '0', 'var'],
       '*=': ['2', '0', 'var'],

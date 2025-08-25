@@ -17,14 +17,14 @@ import { MobileCoderHelpModal } from './MobileCoderHelpModal';
 
 interface AuthButtonProps {
   onAuthStateChange?: (user: AuthUser | null) => void;
+  onFilesSync?: () => void; // Callback to refresh files list after sync
 }
 
 type AuthMode = 'login' | 'register';
 
-export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
+export function AuthButton({ onAuthStateChange, onFilesSync }: AuthButtonProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
@@ -121,15 +121,70 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
         clearForm();
         
         if (authMode === 'register') {
-          // Show MobileCoder help modal for new users
-          setTimeout(() => {
-            setShowHelpModal(true);
-          }, 500);
-        } else {
+          // For new users, sync local files to cloud and then show help modal
           Alert.alert(
-            'Success', 
-            `Welcome back, ${user.name}! Your files can now sync across devices.`
+            'Account Created!', 
+            `Welcome, ${user.name}! Your local files are being synced to the cloud...`,
+            [
+              {
+                text: 'OK',
+                onPress: async () => {
+                  // Trigger initial sync to upload local files
+                  try {
+                    const results = await syncService.syncAllFiles();
+                    onFilesSync?.(); // Refresh files list
+                    if (results.success > 0) {
+                      Alert.alert(
+                        'Sync Complete', 
+                        `${results.success} local files have been uploaded to your cloud storage.`,
+                        [
+                          {
+                            text: 'OK',
+                            onPress: () => {
+                              setTimeout(() => setShowHelpModal(true), 300);
+                            }
+                          }
+                        ]
+                      );
+                    } else {
+                      // Show help modal even if no files were synced
+                      setTimeout(() => setShowHelpModal(true), 500);
+                    }
+                  } catch (error) {
+                    console.error('Initial sync failed:', error);
+                    Alert.alert(
+                      'Sync Warning', 
+                      'Account created successfully, but there was an issue syncing your local files. You can manually sync later.',
+                      [
+                        {
+                          text: 'OK',
+                          onPress: () => {
+                            setTimeout(() => setShowHelpModal(true), 300);
+                          }
+                        }
+                      ]
+                    );
+                  }
+                }
+              }
+            ]
           );
+        } else {
+          // For existing users, automatically sync files
+          try {
+            const results = await syncService.syncAllFiles();
+            onFilesSync?.(); // Refresh files list
+            Alert.alert(
+              'Welcome Back!', 
+              `${user.name}, your files have been synced (${results.success} files updated).`
+            );
+          } catch (error) {
+            console.error('Sign in sync failed:', error);
+            Alert.alert(
+              'Welcome Back!', 
+              `${user.name}, you're signed in but there was an issue syncing files.`
+            );
+          }
         }
       } else {
         Alert.alert(
@@ -175,32 +230,6 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
     );
   };
 
-  const handleSync = async () => {
-    if (!user) {
-      Alert.alert('Not Signed In', 'Please sign in to sync your files.');
-      return;
-    }
-
-    setIsSyncing(true);
-    try {
-      const results: SyncResults = await syncService.syncAllFiles();
-      
-      if (results.failed === 0) {
-        if (results.conflicts > 0) {
-          Alert.alert('Sync Complete', 'Files synced successfully with some conflicts resolved.');
-        } else {
-          Alert.alert('Sync Complete', 'Files synced successfully.');
-        }
-      } else {
-        Alert.alert('Sync Completed with Issues', 'Some files failed to sync. Please try again.');
-      }
-    } catch (error) {
-      console.error('Sync error:', error);
-      Alert.alert('Sync Error', 'An error occurred while syncing files.');
-    } finally {
-      setIsSyncing(false);
-    }
-  };
 
   const renderAuthModal = () => (
     <Modal
@@ -342,21 +371,6 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
       </View>
       
       <View style={styles.actions}>
-        <TouchableOpacity 
-          style={[styles.actionButton, isSyncing && styles.syncingButton]} 
-          onPress={handleSync}
-          disabled={isSyncing}
-        >
-          {isSyncing ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Cloud size={16} color="#FFFFFF" />
-          )}
-          <Text style={styles.actionText}>
-            {isSyncing ? '...' : 'Sync'}
-          </Text>
-        </TouchableOpacity>
-        
         <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
         <LogOut size={14} color="#FF3B30" />
         </TouchableOpacity>
@@ -439,27 +453,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     flexShrink: 0,
-  },
-  actionButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#007AFF',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 8,
-    gap: 4,
-    shadowColor: '#007AFF',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-  },
-  syncingButton: {
-    backgroundColor: '#8E8E93',
-  },
-  actionText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '500',
   },
   signOutButton: {
     padding: 6,

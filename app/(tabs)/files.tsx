@@ -204,6 +204,22 @@ export default function FilesScreen() {
           const path = `${ROOT_DIR}${finalFilename}`;
           await FileSystem.writeAsStringAsync(path, '# New file\n');
           
+          // If user is signed in, automatically sync the new file to cloud
+          if (isAuthenticated) {
+            try {
+              const success = await syncService.uploadFile(path, finalFilename);
+              if (success) {
+                console.log(`New file ${finalFilename} uploaded to cloud`);
+              }
+            } catch (syncError) {
+              console.warn('Failed to sync new file to cloud:', syncError);
+              // Don't block the user - file is still created locally
+            }
+          }
+          
+          // Refresh the files list to show the new file
+          loadFiles();
+          
           // Navigate to editor with the new file
           router.push({
             pathname: '/(tabs)/editor',
@@ -385,10 +401,15 @@ export default function FilesScreen() {
           >
             <HelpCircle size={20} color="#8E8E93" />
           </TouchableOpacity>
-          <AuthButton onAuthStateChange={(user) => {
-            setIsAuthenticated(!!user);
-            loadFiles(); // Reload files when auth state changes
-          }} />
+          <AuthButton 
+            onAuthStateChange={(user) => {
+              setIsAuthenticated(!!user);
+              loadFiles(); // Reload files when auth state changes
+            }}
+            onFilesSync={() => {
+              loadFiles(); // Refresh files list after sync
+            }}
+          />
           <TouchableOpacity style={styles.headerButton} onPress={handleCreateFile}>
             <Plus size={20} color="#007AFF" />
           </TouchableOpacity>

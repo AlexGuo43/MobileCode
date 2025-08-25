@@ -109,12 +109,12 @@ class SmartKeyboardService {
 
   private getNewLineScore(button: KeyboardButton): number {
     const commonStarters: Record<string, number> = {
+      'var': 1.0,
       'if': 0.9,
       'for': 0.8,
       'while': 0.7,
       'def': 0.6,
       'class': 0.6,
-      'var': 0.6,
       'try': 0.5,
       'import': 0.5,
       'from': 0.5,

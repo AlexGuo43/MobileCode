@@ -13,6 +13,7 @@ import {
 import { LogIn, LogOut, Cloud, UserPlus, Smartphone, X } from 'lucide-react-native';
 import { authService, AuthUser } from '../services/authService';
 import { syncService, SyncResults } from '../services/syncService';
+import { MobileCoderHelpModal } from './MobileCoderHelpModal';
 
 interface AuthButtonProps {
   onAuthStateChange?: (user: AuthUser | null) => void;
@@ -25,6 +26,7 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
   const [authMode, setAuthMode] = useState<AuthMode>('login');
   
   // Form states
@@ -85,10 +87,18 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
         onAuthStateChange?.(user);
         setShowAuthModal(false);
         clearForm();
-        Alert.alert(
-          'Success', 
-          `Welcome, ${user.name}! Your files can now sync across devices.`
-        );
+        
+        if (authMode === 'register') {
+          // Show MobileCoder help modal for new users
+          setTimeout(() => {
+            setShowHelpModal(true);
+          }, 500);
+        } else {
+          Alert.alert(
+            'Success', 
+            `Welcome back, ${user.name}! Your files can now sync across devices.`
+          );
+        }
       } else {
         Alert.alert(
           'Error', 
@@ -193,6 +203,7 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
                 <TextInput
                   style={styles.input}
                   placeholder="Full Name"
+                  placeholderTextColor="#8E8E93"
                   value={name}
                   onChangeText={setName}
                   autoCapitalize="words"
@@ -203,6 +214,7 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
               <TextInput
                 style={styles.input}
                 placeholder="Email"
+                placeholderTextColor="#8E8E93"
                 value={email}
                 onChangeText={setEmail}
                 keyboardType="email-address"
@@ -213,6 +225,7 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
               <TextInput
                 style={styles.input}
                 placeholder="Password"
+                placeholderTextColor="#8E8E93"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry
@@ -275,6 +288,10 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
           <Text style={styles.signInText}>Sign In</Text>
         </TouchableOpacity>
         {renderAuthModal()}
+        <MobileCoderHelpModal
+          visible={showHelpModal}
+          onClose={() => setShowHelpModal(false)}
+        />
       </View>
     );
   }
@@ -312,6 +329,11 @@ export function AuthButton({ onAuthStateChange }: AuthButtonProps) {
         <LogOut size={14} color="#FF3B30" />
         </TouchableOpacity>
       </View>
+      
+      <MobileCoderHelpModal
+        visible={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+      />
     </View>
   );
 }

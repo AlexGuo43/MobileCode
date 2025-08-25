@@ -8,10 +8,11 @@ import {
   SafeAreaView,
   Alert,
 } from 'react-native';
-import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud, Edit } from 'lucide-react-native';
+import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud, Edit, HelpCircle } from 'lucide-react-native';
 import * as FileSystem from 'expo-file-system';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AuthButton } from '@/components/AuthButton';
+import { MobileCoderHelpModal } from '@/components/MobileCoderHelpModal';
 import { syncService, SyncFile } from '@/services/syncService';
 import { authService } from '@/services/authService';
 
@@ -32,6 +33,7 @@ export default function FilesScreen() {
   const [files, setFiles] = useState<FileItem[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [showHelpModal, setShowHelpModal] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -377,6 +379,12 @@ export default function FilesScreen() {
       <View style={styles.header}>
         <Text style={styles.title}>Files</Text>
         <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.helpButton} 
+            onPress={() => setShowHelpModal(true)}
+          >
+            <HelpCircle size={20} color="#8E8E93" />
+          </TouchableOpacity>
           <AuthButton onAuthStateChange={(user) => {
             setIsAuthenticated(!!user);
             loadFiles(); // Reload files when auth state changes
@@ -413,6 +421,11 @@ export default function FilesScreen() {
           </TouchableOpacity>
         </View>
       )}
+
+      <MobileCoderHelpModal
+        visible={showHelpModal}
+        onClose={() => setShowHelpModal(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -443,6 +456,10 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'flex-end',
     minWidth: 0,
+  },
+  helpButton: {
+    padding: 8,
+    borderRadius: 8,
   },
   headerButton: {
     padding: 8,

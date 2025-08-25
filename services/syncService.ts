@@ -31,6 +31,19 @@ export interface SyncResults {
   conflicts: number;
 }
 
+export interface StorageInfo {
+  used: number;
+  limit: number;
+  available: number;
+  percentUsed: number;
+}
+
+export interface StorageError {
+  error: string;
+  message: string;
+  storageInfo: StorageInfo;
+}
+
 class SyncService {
   private async getAuthHeaders(): Promise<HeadersInit> {
     const token = await authService.getAccessToken();
@@ -67,6 +80,12 @@ class SyncService {
         // Conflict detected
         console.warn('File conflict detected:', data.data);
         return false;
+      }
+
+      if (response.status === 413) {
+        // Storage limit exceeded
+        const storageError: StorageError = data;
+        throw new Error(`Storage Limit Exceeded: ${storageError.message}`);
       }
 
       if (!response.ok) {
@@ -166,6 +185,13 @@ class SyncService {
         body: JSON.stringify({ files: localFiles }),
       });
 
+      if (response.status === 413) {
+        // Storage limit exceeded
+        const data = await response.json();
+        const storageError: StorageError = data;
+        throw new Error(`Storage Limit Exceeded: ${storageError.message}`);
+      }
+
       if (!response.ok) {
         throw new Error(`Sync failed: ${response.statusText}`);
       }
@@ -243,6 +269,25 @@ class SyncService {
     } catch (error) {
       console.error('Delete file error:', error);
       return false;
+    }
+  }
+
+  async getStorageInfo(): Promise<StorageInfo | null> {
+    try {
+      const headers = await this.getAuthHeaders();
+      const response = await fetch(`${API_BASE_URL}/sync/storage`, {
+        headers,
+      });
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch storage info: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      return data.data;
+    } catch (error) {
+      console.error('Get storage info error:', error);
+      return null;
     }
   }
 

@@ -152,18 +152,35 @@ export function AuthButton({ onAuthStateChange, onFilesSync }: AuthButtonProps) 
                     }
                   } catch (error) {
                     console.error('Initial sync failed:', error);
-                    Alert.alert(
-                      'Sync Warning', 
-                      'Account created successfully, but there was an issue syncing your local files. You can manually sync later.',
-                      [
-                        {
-                          text: 'OK',
-                          onPress: () => {
-                            setTimeout(() => setShowHelpModal(true), 300);
+                    onFilesSync?.(); // Refresh files list even if sync failed
+                    
+                    if (error instanceof Error && error.message.includes('Storage Limit Exceeded')) {
+                      Alert.alert(
+                        'Storage Limit Exceeded', 
+                        'Account created successfully! However, some local files could not be synced due to storage limits. You can free up space or upgrade your plan.',
+                        [
+                          {
+                            text: 'OK',
+                            onPress: () => {
+                              setTimeout(() => setShowHelpModal(true), 300);
+                            }
                           }
-                        }
-                      ]
-                    );
+                        ]
+                      );
+                    } else {
+                      Alert.alert(
+                        'Sync Warning', 
+                        'Account created successfully, but there was an issue syncing your local files. You can manually sync later.',
+                        [
+                          {
+                            text: 'OK',
+                            onPress: () => {
+                              setTimeout(() => setShowHelpModal(true), 300);
+                            }
+                          }
+                        ]
+                      );
+                    }
                   }
                 }
               }
@@ -180,10 +197,19 @@ export function AuthButton({ onAuthStateChange, onFilesSync }: AuthButtonProps) 
             );
           } catch (error) {
             console.error('Sign in sync failed:', error);
-            Alert.alert(
-              'Welcome Back!', 
-              `${user.name}, you're signed in but there was an issue syncing files.`
-            );
+            onFilesSync?.(); // Refresh files list even if sync failed
+            
+            if (error instanceof Error && error.message.includes('Storage Limit Exceeded')) {
+              Alert.alert(
+                'Storage Limit Exceeded', 
+                `Welcome back, ${user.name}! Some files could not be synced due to storage limits. Please free up space or upgrade your plan.`
+              );
+            } else {
+              Alert.alert(
+                'Welcome Back!', 
+                `${user.name}, you're signed in but there was an issue syncing files.`
+              );
+            }
           }
         }
       } else {

@@ -13,7 +13,7 @@ import * as FileSystem from 'expo-file-system';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AuthButton } from '@/components/AuthButton';
 import { MobileCoderHelpModal } from '@/components/MobileCoderHelpModal';
-import { syncService, SyncFile } from '@/services/syncService';
+import { syncService, SyncFile, StorageInfo } from '@/services/syncService';
 import { authService } from '@/services/authService';
 
 interface FileItem {
@@ -34,6 +34,7 @@ export default function FilesScreen() {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -58,10 +59,20 @@ export default function FilesScreen() {
     }, [isAuthenticated])
   );
 
+  const loadStorageInfo = async () => {
+    if (isAuthenticated) {
+      const storage = await syncService.getStorageInfo();
+      setStorageInfo(storage);
+    } else {
+      setStorageInfo(null);
+    }
+  };
+
   const loadFiles = async () => {
     if (!isAuthenticated) {
       // Show local files when not authenticated
       await loadLocalFiles();
+      setStorageInfo(null);
       return;
     }
 
@@ -76,10 +87,13 @@ export default function FilesScreen() {
         isSynced: true,
       }));
       setFiles(items);
+      // Also load storage info when loading files
+      await loadStorageInfo();
     } catch (err) {
       console.error('Failed to load cloud files', err);
       // Fallback to local files if cloud fails
       await loadLocalFiles();
+      setStorageInfo(null);
     }
   };
 
@@ -210,9 +224,18 @@ export default function FilesScreen() {
               const success = await syncService.uploadFile(path, finalFilename);
               if (success) {
                 console.log(`New file ${finalFilename} uploaded to cloud`);
+                // Refresh storage info after successful upload
+                await loadStorageInfo();
               }
             } catch (syncError) {
               console.warn('Failed to sync new file to cloud:', syncError);
+              if (syncError instanceof Error && syncError.message.includes('Storage Limit Exceeded')) {
+                Alert.alert(
+                  'Storage Limit Exceeded',
+                  'Your file was created locally but could not be synced to the cloud due to storage limits. Please free up space or upgrade your plan.',
+                  [{ text: 'OK' }]
+                );
+              }
               // Don't block the user - file is still created locally
             }
           }
@@ -393,7 +416,25 @@ export default function FilesScreen() {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.title}>Files</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.title}>Files</Text>
+          {storageInfo && isAuthenticated && (
+            <View style={styles.storageInfo}>
+              <View style={styles.storageBar}>
+                <View 
+                  style={[
+                    styles.storageUsed, 
+                    { width: `${storageInfo.percentUsed}%` },
+                    storageInfo.percentUsed > 90 && styles.storageWarning
+                  ]} 
+                />
+              </View>
+              <Text style={styles.storageText}>
+                {Math.round(storageInfo.used / 1024 / 1024 * 10) / 10}MB / {storageInfo.limit / 1024 / 1024}MB
+              </Text>
+            </View>
+          )}
+        </View>
         <View style={styles.headerActions}>
           <TouchableOpacity 
             style={styles.helpButton} 
@@ -470,6 +511,33 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 24,
     fontWeight: 'bold',
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  storageInfo: {
+    marginTop: 6,
+    gap: 4,
+  },
+  storageBar: {
+    height: 4,
+    backgroundColor: '#3C3C3E',
+    borderRadius: 2,
+    overflow: 'hidden',
+    width: 120,
+  },
+  storageUsed: {
+    height: '100%',
+    backgroundColor: '#007AFF',
+    borderRadius: 2,
+  },
+  storageWarning: {
+    backgroundColor: '#FF9500',
+  },
+  storageText: {
+    color: '#8E8E93',
+    fontSize: 11,
+    fontFamily: 'System',
   },
   headerActions: {
     flexDirection: 'row',

@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { templateService } from '../utils/templateSystem';
+import { getLanguageByKey } from '../utils/languageDefinitions';
 
 interface SyntaxHighlighterProps {
   code: string;
@@ -9,17 +10,9 @@ interface SyntaxHighlighterProps {
 }
 
 export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHighlighterProps) {
-  const highlightPython = (text: string) => {
-    const keywords = [
-      'def', 'class', 'if', 'elif', 'else', 'for', 'while', 'try', 'except', 'finally',
-      'import', 'from', 'as', 'return', 'yield', 'break', 'continue', 'pass', 'lambda',
-      'and', 'or', 'not', 'in', 'is', 'True', 'False', 'None', 'with', 'async', 'await'
-    ];
-    
-    const builtins = [
-      'print', 'input', 'len', 'range', 'enumerate', 'zip', 'map', 'filter', 'reduce',
-      'str', 'int', 'float', 'bool', 'list', 'dict', 'set', 'tuple', 'type', 'isinstance'
-    ];
+  const highlightCode = (text: string, languageKey: string) => {
+    const languageDefinition = getLanguageByKey(languageKey);
+    const { keywords, builtins, stringDelimiters, commentStart, blockComment } = languageDefinition.syntax;
 
     const lines = text.split('\n');
     
@@ -33,7 +26,8 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
       for (let i = 0; i < line.length; i++) {
         const char = line[i];
         
-        if (!inString && !inComment && (char === '"' || char === "'")) {
+        // Check for string delimiters
+        if (!inString && !inComment && stringDelimiters.includes(char)) {
           if (currentToken) {
             tokens.push({ text: currentToken, type: 'default' });
             currentToken = '';
@@ -47,16 +41,17 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
           currentToken = '';
           inString = false;
           stringChar = '';
-        } else if (!inString && char === '#') {
+        } else if (!inString && !inComment && line.substring(i).startsWith(commentStart)) {
           if (currentToken) {
             tokens.push({ text: currentToken, type: 'default' });
             currentToken = '';
           }
           inComment = true;
-          currentToken = char;
+          currentToken = commentStart;
+          i += commentStart.length - 1; // Skip comment start characters
         } else if (inString || inComment) {
           currentToken += char;
-        } else if (/\s/.test(char) || /[()[\]{},.:;=+\-*/<>!&|]/.test(char)) {
+        } else if (/\s/.test(char) || /[()[\]{},.:;=+\-*/<>!&|%]/.test(char)) {
           if (currentToken) {
             const tokenType = keywords.includes(currentToken) ? 'keyword' :
                             builtins.includes(currentToken) ? 'builtin' :
@@ -93,7 +88,7 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
             
             // Check if this token text is a template placeholder
             const cleanToken = token.text.replace(/[^\w]/g, '').trim().toLowerCase(); // Remove punctuation and normalize case
-            const isTemplate = ['function', 'condition', 'classname', 'module', 'var'].includes(cleanToken);
+            const isTemplate = ['function', 'condition', 'classname', 'module', 'var', 'type'].includes(cleanToken);
             
             // Just highlight templates, use button for interaction
             if (isTemplate) {
@@ -129,7 +124,7 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
   return (
     <View style={styles.container}>
       <Text style={styles.code}>
-        {language === 'python' ? highlightPython(code) : code}
+        {highlightCode(code, language)}
       </Text>
     </View>
   );

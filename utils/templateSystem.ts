@@ -1,4 +1,5 @@
 import { storage } from './storage';
+import { LanguageDefinition } from './languageDefinitions';
 
 interface TemplateHistory {
   functions: string[];
@@ -6,13 +7,14 @@ interface TemplateHistory {
   variables: string[];
   conditions: string[];
   modules: string[];
+  types: string[];
 }
 
 interface TemplateMatch {
   placeholder: string;
   start: number;
   end: number;
-  type: 'function' | 'class' | 'variable' | 'condition' | 'module';
+  type: 'function' | 'class' | 'variable' | 'condition' | 'module' | 'type';
 }
 
 class TemplateService {
@@ -22,6 +24,7 @@ class TemplateService {
     variables: ['result', 'data', 'value', 'item', 'index', 'temp'],
     conditions: ['x > 0', 'i < len(arr)', 'data is not None', 'result == True'],
     modules: ['os', 'sys', 'math', 'random', 'json', 'datetime'],
+    types: ['int', 'string', 'bool', 'float', 'double'],
   };
 
   private readonly STORAGE_KEY = 'templateHistory';
@@ -33,6 +36,7 @@ class TemplateService {
     ClassName: /\bClassName\b/g,
     module: /\bmodule\b/g,
     var: /\bvar\b/g,
+    type: /\btype\b/g,
   };
 
   async initialize(): Promise<void> {
@@ -79,7 +83,7 @@ class TemplateService {
     ) || null;
   }
 
-  getSuggestionsForType(type: TemplateMatch['type']): string[] {
+  getSuggestionsForType(type: TemplateMatch['type'], currentLanguage?: LanguageDefinition): string[] {
     switch (type) {
       case 'function':
         return this.history.functions;
@@ -91,8 +95,46 @@ class TemplateService {
         return this.history.conditions;
       case 'module':
         return this.history.modules;
+      case 'type':
+        return this.getLanguageTypes(currentLanguage);
       default:
         return [];
+    }
+  }
+
+  private getLanguageTypes(currentLanguage?: LanguageDefinition): string[] {
+    // Combine language-specific types with user history
+    const languageTypes = this.getTypesForLanguage(currentLanguage?.key);
+    const historyTypes = this.history.types.filter(t => !languageTypes.includes(t));
+    
+    // Language types first, then user history
+    return [...languageTypes, ...historyTypes];
+  }
+
+  private getTypesForLanguage(languageKey?: string): string[] {
+    switch (languageKey) {
+      case 'python':
+        return ['int', 'str', 'float', 'bool', 'list', 'dict', 'set', 'tuple', 'None'];
+      case 'javascript':
+        return ['let', 'const', 'var', 'string', 'number', 'boolean', 'object', 'array'];
+      case 'typescript':
+        return ['string', 'number', 'boolean', 'object', 'array', 'any', 'void', 'null', 'undefined'];
+      case 'java':
+        return ['int', 'String', 'double', 'boolean', 'char', 'float', 'long', 'byte', 'ArrayList', 'HashMap'];
+      case 'cpp':
+        return ['int', 'string', 'double', 'bool', 'char', 'float', 'vector<int>', 'map<int, int>', 'auto'];
+      case 'c':
+        return ['int', 'double', 'char', 'float', 'long', 'short', 'unsigned', 'void', 'struct'];
+      case 'go':
+        return ['int', 'string', 'float64', 'bool', 'byte', 'rune', '[]int', 'map[string]int', 'interface{}'];
+      case 'rust':
+        return ['i32', 'String', 'f64', 'bool', 'char', 'u32', 'Vec<i32>', 'HashMap<String, i32>', 'Option<T>'];
+      case 'csharp':
+        return ['int', 'string', 'double', 'bool', 'char', 'float', 'decimal', 'List<int>', 'Dictionary<string, int>'];
+      case 'php':
+        return ['int', 'string', 'float', 'bool', 'array', 'object', 'null', 'mixed', 'callable'];
+      default:
+        return ['int', 'string', 'bool', 'float', 'double'];
     }
   }
 
@@ -130,6 +172,8 @@ class TemplateService {
         return 'module';
       case 'var':
         return 'variable';
+      case 'type':
+        return 'type';
       default:
         return 'variable';
     }
@@ -145,6 +189,8 @@ class TemplateService {
         return 'conditions';
       case 'module':
         return 'modules';
+      case 'type':
+        return 'types';
       default:
         return 'variables';
     }

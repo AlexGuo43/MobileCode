@@ -41,6 +41,7 @@ import { templateService, TemplateMatch } from '@/utils/templateSystem';
 import { syncService } from '@/services/syncService';
 // No clipboard import needed - using React Native's built-in method
 import { authService } from '@/services/authService';
+import { useLanguage } from '@/contexts/LanguageContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
@@ -56,7 +57,8 @@ export default function EditorScreen() {
   const [code, setCode] = useState(INITIAL_CODE);
   const [isTerminalVisible, setIsTerminalVisible] = useState(false);
   const [activeFile, setActiveFile] = useState('main.py');
-  const [language, setLanguage] = useState('python');
+  const { currentLanguage, setLanguageByFileExtension } = useLanguage();
+  const [language, setLanguage] = useState('python'); // Keep for LeetCode compatibility
   const [codeDefs, setCodeDefs] = useState<any[]>([]);
   const [showLangMenu, setShowLangMenu] = useState(false);
   const [cursorPosition, setCursorPosition] = useState(0);
@@ -258,8 +260,13 @@ export default function EditorScreen() {
           updateHistory(content, content.length);
           const name = fileUri.split('/').pop() || 'file';
           setActiveFile(cloudFileName || name);
-        const ext = name.split('.').pop() || '';
-        setLanguage(getLangFromExt(ext));
+          
+          // Detect and set language based on file extension
+          setLanguageByFileExtension(name);
+          
+          // Also set local language state for LeetCode compatibility
+          const ext = name.split('.').pop() || '';
+          setLanguage(getLangFromExt(ext));
         // Clear code definitions since this is a local file, not a LeetCode problem
         setCodeDefs([]);
       } catch (e) {
@@ -789,7 +796,7 @@ export default function EditorScreen() {
                   <View style={styles.codeContentColumn}>
                     <SyntaxHighlighter 
                       code={paddedCode} 
-                      language={'python'} 
+                      language={currentLanguage.key} 
                       onTemplateClick={handleTemplateClick}
                     />
                     <View
@@ -919,6 +926,7 @@ export default function EditorScreen() {
       <TemplateRenamer
         visible={showTemplateRenamer}
         template={activeTemplate}
+        currentLanguage={currentLanguage}
         onClose={() => {
           setShowTemplateRenamer(false);
           setActiveTemplate(null);

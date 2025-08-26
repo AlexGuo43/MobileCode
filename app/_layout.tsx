@@ -14,6 +14,7 @@ import {
 } from '@expo-google-fonts/source-code-pro';
 import * as SplashScreen from 'expo-splash-screen';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { LanguageProvider } from '@/contexts/LanguageContext';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -40,11 +41,13 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="+not-found" />
-      </Stack>
-      <StatusBar style="auto" />
+      <LanguageProvider>
+        <Stack screenOptions={{ headerShown: false }}>
+          <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="+not-found" />
+        </Stack>
+        <StatusBar style="auto" />
+      </LanguageProvider>
     </GestureHandlerRootView>
   );
 }

@@ -6,11 +6,13 @@ import {
   ScrollView,
   StyleSheet,
   Dimensions,
+  Modal,
 } from 'react-native';
-import { Settings, Zap, ZapOff } from 'lucide-react-native';
+import { Settings, Zap, ZapOff, Globe } from 'lucide-react-native';
 import { storage } from '../utils/storage';
 import { KeyboardCustomizer, KeyboardTab, KeyboardButton } from './KeyboardCustomizer';
 import { smartKeyboardService, TypingContext, SmartPrediction } from '../utils/smartKeyboard';
+import { useLanguageSnippets, useLanguage } from '../contexts/LanguageContext';
 
 interface CodeKeyboardProps {
   onInsert: (text: string) => void;
@@ -24,95 +26,6 @@ interface CodeKeyboardProps {
   cursorPosition?: number;
 }
 
-const defaultTabs: KeyboardTab[] = [
-  {
-    key: 'snippets',
-    label: 'Snippets',
-    data: [
-      { id: '1', label: '=', text: '= ' },
-      { id: '2', label: '+=', text: '+= ' },
-      { id: '3', label: 'ans', text: 'ans ' },
-      { id: '4', label: 'curr', text: 'curr ' },
-      { id: '5', label: '0', text: '0 ' },
-      { id: '6', label: "''", text: "''" },
-      { id: '7', label: 'if', text: 'if condition:\n    ' },
-      { id: '8', label: 'else', text: 'else:\n    ' },
-      { id: '9', label: 'elif', text: 'elif condition:\n    ' },
-      { id: '10', label: 'for', text: 'for ' },
-      { id: '11', label: 'i', text: 'i ' },
-      { id: '12', label: 'x', text: 'x ' },
-      { id: '13', label: 'num', text: 'num ' },
-      { id: '14', label: 'c', text: 'c ' },
-      { id: '15', label: 'in', text: 'in ' },
-      { id: '16', label: 'while', text: 'while condition:\n    ' },
-      { id: '17', label: 'len', text: 'len(' },
-      { id: '18', label: 'enumerate', text: 'enumerate(' },
-      { id: '19', label: 'range', text: 'range(' },
-      { id: '20', label: 'chr', text: 'chr(' },
-      { id: '21', label: 'ord', text: 'ord(' },
-      { id: '22', label: ')', text: ')' },
-      { id: '23', label: 'int', text: 'int(' },
-      { id: '24', label: 'set', text: 'set(' },
-      { id: '25', label: 'str', text: 'str(' },
-      { id: '26', label: 'float', text: 'float(' },
-      { id: '27', label: 'list', text: 'list(' },
-      { id: '28', label: 'dict', text: 'dict(' },
-      { id: '29', label: 'print', text: 'print(' },
-      { id: '30', label: 'input', text: 'input(' },
-      { id: '31', label: 'def', text: 'def function():\n    ' },
-      { id: '32', label: 'try', text: 'try:\n    \nexcept:\n    ' },
-      { id: '33', label: 'class', text: 'class ClassName:\n    def __init__(self):\n        ' },
-      { id: '34', label: 'import', text: 'import ' },
-      { id: '35', label: 'from', text: 'from module import ' },
-      { id: '36', label: 'var', text: 'var' },
-      { id: '68', label: ':', text: ':' },
-      { id: '69', label: '10', text: '10' },
-      { id: '70', label: '1', text: '1' },
-      { id: '71', label: 'arr', text: 'arr' },
-      { id: '72', label: 'nums', text: 'nums' },
-      { id: '73', label: 'list', text: 'list' },
-    ],
-  },
-  {
-    key: 'symbols',
-    label: 'Symbols',
-    data: [
-      { id: '37', label: '()', text: '()' },
-      { id: '38', label: '[]', text: '[]' },
-      { id: '39', label: '{}', text: '{}' },
-      { id: '40', label: '""', text: '""' },
-      { id: '41', label: "''", text: "''" },
-      { id: '42', label: ':', text: ':' },
-      { id: '43', label: ';', text: ';' },
-      { id: '44', label: '->', text: '->' },
-      { id: '45', label: '=>', text: '=>' },
-      { id: '46', label: '==', text: '==' },
-      { id: '47', label: '!=', text: '!=' },
-      { id: '48', label: '<=', text: '<=' },
-      { id: '49', label: '>=', text: '>=' },
-      { id: '50', label: '&&', text: '&&' },
-      { id: '51', label: '||', text: '||' },
-      { id: '52', label: '++', text: '++' },
-      { id: '53', label: '--', text: '--' },
-      { id: '54', label: '+=', text: '+=' },
-      { id: '55', label: '-=', text: '-=' },
-      { id: '56', label: '*=', text: '*=' },
-    ],
-  },
-  {
-    key: 'collections',
-    label: 'Collections',
-    data: [
-      { id: '57', label: 'defaultdict', text: 'collections.defaultdict(' },
-      { id: '58', label: 'Counter', text: 'collections.Counter(' },
-      { id: '59', label: 'OrderedDict', text: 'collections.OrderedDict(' },
-      { id: '60', label: 'deque', text: 'collections.deque(' },
-      { id: '61', label: 'heappush', text: 'heapq.heappush(' },
-      { id: '62', label: 'heappop', text: 'heapq.heappop(' },
-      { id: '63', label: 'namedtuple', text: 'collections.namedtuple(' },
-    ],
-  },
-];
 
 export function CodeKeyboard({
   onInsert,
@@ -125,16 +38,25 @@ export function CodeKeyboard({
   currentText = '',
   cursorPosition = 0,
 }: CodeKeyboardProps) {
+  const { getAllSnippetsAsTabs, currentLanguage } = useLanguageSnippets();
+  const { supportedLanguages, setLanguage } = useLanguage();
   const [activeTab, setActiveTab] = useState(0);
-  const [tabs, setTabs] = useState<KeyboardTab[]>(defaultTabs);
+  const [tabs, setTabs] = useState<KeyboardTab[]>([]);
   const [showCustomizer, setShowCustomizer] = useState(false);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [smartMode, setSmartMode] = useState(true);
   const [smartPredictions, setSmartPredictions] = useState<SmartPrediction[]>([]);
 
   useEffect(() => {
-    loadCustomTabs();
+    loadLanguageBasedTabs();
     initializeSmartKeyboard();
-  }, []);
+  }, [currentLanguage]);
+
+  useEffect(() => {
+    if (tabs.length > 0) {
+      loadCustomTabs();
+    }
+  }, [tabs.length]);
 
   useEffect(() => {
     if (smartMode) {
@@ -142,16 +64,26 @@ export function CodeKeyboard({
     }
   }, [smartMode, currentText, cursorPosition, activeTab]);
 
+  const loadLanguageBasedTabs = () => {
+    // Get tabs for current language
+    const languageTabs = getAllSnippetsAsTabs();
+    setTabs(languageTabs);
+    setActiveTab(0); // Reset to first tab when language changes
+  };
+
   const loadCustomTabs = async () => {
     try {
-      const savedTabs = await storage.getItem('customKeyboardTabs');
+      // Load custom tabs specific to current language
+      const storageKey = `customKeyboardTabs_${currentLanguage.key}`;
+      const savedTabs = await storage.getItem(storageKey);
       if (savedTabs) {
         const parsedTabs = JSON.parse(savedTabs);
-        // Migrate old 'var = ' to new 'var' format
+        // Apply any migration logic if needed
         const migratedTabs = parsedTabs.map((tab: KeyboardTab) => ({
           ...tab,
           data: tab.data.map((button: KeyboardButton) => {
-            if (button.id === '36' && button.label === 'var' && button.text === 'var = ') {
+            // Legacy migration for Python
+            if (currentLanguage.key === 'python' && button.id === '36' && button.label === 'var' && button.text === 'var = ') {
               return { ...button, text: 'var' };
             }
             return button;
@@ -159,7 +91,7 @@ export function CodeKeyboard({
         }));
         setTabs(migratedTabs);
         // Save the migrated version
-        await storage.setItem('customKeyboardTabs', JSON.stringify(migratedTabs));
+        await storage.setItem(storageKey, JSON.stringify(migratedTabs));
       }
     } catch (error) {
       console.error('Failed to load custom keyboard tabs:', error);
@@ -192,19 +124,26 @@ export function CodeKeyboard({
 
   const updateSmartPredictions = () => {
     const context = getTypingContext();
-    const predictions = smartKeyboardService.getSmartPredictions(tabs, context, 6);
+    const predictions = smartKeyboardService.getSmartPredictions(tabs, context, currentLanguage, 6);
     setSmartPredictions(predictions);
   };
 
   const handleSmartInsert = async (button: KeyboardButton) => {
     const context = getTypingContext();
     await smartKeyboardService.recordButtonUsage(button, context);
-    const smartText = smartKeyboardService.getSmartButtonText(button, context);
+    const smartText = smartKeyboardService.getSmartButtonText(button, context, currentLanguage);
     onInsert(smartText);
   };
 
-  const handleCustomizerSave = (newTabs: KeyboardTab[]) => {
+  const handleCustomizerSave = async (newTabs: KeyboardTab[]) => {
     setTabs(newTabs);
+    // Save custom tabs for current language
+    try {
+      const storageKey = `customKeyboardTabs_${currentLanguage.key}`;
+      await storage.setItem(storageKey, JSON.stringify(newTabs));
+    } catch (error) {
+      console.error('Failed to save custom keyboard tabs:', error);
+    }
   };
 
   const currentData = tabs[activeTab]?.data || [];
@@ -221,6 +160,13 @@ export function CodeKeyboard({
         style={styles.tabContainer}
         contentContainerStyle={styles.tabContent}
       >
+        <TouchableOpacity
+          style={styles.languageButton}
+          onPress={() => setShowLanguageSelector(true)}
+        >
+          <Globe size={14} color="#007AFF" />
+          <Text style={styles.languageButtonText}>{currentLanguage.key.toUpperCase()}</Text>
+        </TouchableOpacity>
         {tabs.map((tab, index) => (
           <TouchableOpacity
             key={tab.key}
@@ -347,8 +293,57 @@ export function CodeKeyboard({
         isVisible={showCustomizer}
         onClose={() => setShowCustomizer(false)}
         onSave={handleCustomizerSave}
-        initialTabs={defaultTabs}
+        initialTabs={getAllSnippetsAsTabs()}
       />
+
+      {/* Language Selector Modal */}
+      <Modal
+        visible={showLanguageSelector}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowLanguageSelector(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.languageModal}>
+            <Text style={styles.languageModalTitle}>Select Language</Text>
+            <ScrollView style={styles.languageList}>
+              {supportedLanguages.map((language) => (
+                <TouchableOpacity
+                  key={language.key}
+                  style={[
+                    styles.languageItem,
+                    currentLanguage.key === language.key && styles.selectedLanguageItem,
+                  ]}
+                  onPress={() => {
+                    setLanguage(language);
+                    setShowLanguageSelector(false);
+                  }}
+                >
+                  <Text
+                    style={[
+                      styles.languageItemText,
+                      currentLanguage.key === language.key && styles.selectedLanguageItemText,
+                    ]}
+                  >
+                    {language.name}
+                  </Text>
+                  {currentLanguage.key === language.key && (
+                    <View style={styles.checkmark}>
+                      <Text style={styles.checkmarkText}>✓</Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.modalCloseButton}
+              onPress={() => setShowLanguageSelector(false)}
+            >
+              <Text style={styles.modalCloseText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -391,6 +386,87 @@ const styles = StyleSheet.create({
     padding: 8,
     borderRadius: 6,
     backgroundColor: '#3C3C3E',
+  },
+  languageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: '#3C3C3E',
+    gap: 4,
+  },
+  languageButtonText: {
+    color: '#007AFF',
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: 'FiraCode-Regular',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  languageModal: {
+    backgroundColor: '#1C1C1E',
+    borderRadius: 12,
+    padding: 20,
+    width: '80%',
+    maxHeight: '60%',
+  },
+  languageModalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  languageList: {
+    maxHeight: 200,
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 4,
+  },
+  selectedLanguageItem: {
+    backgroundColor: '#007AFF',
+  },
+  languageItemText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  selectedLanguageItemText: {
+    color: '#FFFFFF',
+    fontWeight: '600',
+  },
+  checkmark: {
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checkmarkText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontWeight: 'bold',
+  },
+  modalCloseButton: {
+    backgroundColor: '#3C3C3E',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginTop: 16,
+  },
+  modalCloseText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '500',
   },
   keyboardRow: {
     paddingVertical: 12,

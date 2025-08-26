@@ -12,10 +12,12 @@ import {
 } from 'react-native';
 import { X, Check } from 'lucide-react-native';
 import { templateService, TemplateMatch } from '../utils/templateSystem';
+import { LanguageDefinition } from '../utils/languageDefinitions';
 
 interface TemplateRenamerProps {
   visible: boolean;
   template: TemplateMatch | null;
+  currentLanguage?: LanguageDefinition;
   onClose: () => void;
   onConfirm: (newValue: string) => void;
 }
@@ -23,6 +25,7 @@ interface TemplateRenamerProps {
 export function TemplateRenamer({ 
   visible, 
   template, 
+  currentLanguage,
   onClose, 
   onConfirm 
 }: TemplateRenamerProps) {
@@ -33,10 +36,10 @@ export function TemplateRenamer({
   useEffect(() => {
     if (template) {
       setCurrentValue(''); // Start with empty field
-      const templateSuggestions = templateService.getSuggestionsForType(template.type);
+      const templateSuggestions = templateService.getSuggestionsForType(template.type, currentLanguage);
       setSuggestions(templateSuggestions);
     }
-  }, [template]);
+  }, [template, currentLanguage]);
 
   const handleConfirm = async () => {
     if (currentValue.trim() && template) {
@@ -130,7 +133,7 @@ export function TemplateRenamer({
             contentContainerStyle={styles.quickInsertContent}
             keyboardShouldPersistTaps="handled"
           >
-            {getQuickInsertButtons(template.type).map((button, index) => (
+            {getQuickInsertButtons(template.type, currentLanguage).map((button, index) => (
               <TouchableOpacity
                 key={index}
                 style={styles.quickInsertButton}
@@ -164,7 +167,7 @@ export function TemplateRenamer({
   );
 }
 
-function getQuickInsertButtons(type: TemplateMatch['type']) {
+function getQuickInsertButtons(type: TemplateMatch['type'], currentLanguage?: LanguageDefinition) {
   const common = [
     { label: '_', text: '_' },
     { label: 'CamelCase', text: '' }, // Special case
@@ -191,19 +194,7 @@ function getQuickInsertButtons(type: TemplateMatch['type']) {
         ...common,
       ];
     case 'variable':
-      return [
-        { label: '[', text: '[' },
-        { label: ']', text: ']' },
-        { label: 'i', text: 'i' },
-        { label: '.append()', text: '.append()' },
-        { label: '.pop()', text: '.pop()' },
-        { label: 'data', text: 'data' },
-        { label: 'result', text: 'result' },
-        { label: 'value', text: 'value' },
-        { label: 'item', text: 'item' },
-        { label: 'index', text: 'index' },
-        ...common,
-      ];
+      return getVariableQuickInsertButtons(currentLanguage);
     case 'condition':
       return [
         { label: '>', text: ' > ' },
@@ -224,8 +215,202 @@ function getQuickInsertButtons(type: TemplateMatch['type']) {
         { label: 'datetime', text: 'datetime' },
         { label: 'random', text: 'random' },
       ];
+    case 'type':
+      return getTypeQuickInsertButtons(currentLanguage);
     default:
       return common;
+  }
+}
+
+function getVariableQuickInsertButtons(currentLanguage?: LanguageDefinition) {
+  // Common variable naming patterns
+  const common = [
+    { label: '_', text: '_' },
+    { label: 'CamelCase', text: '' },
+    { label: 'snake_case', text: '' },
+  ];
+
+  const commonNames = [
+    { label: 'data', text: 'data' },
+    { label: 'result', text: 'result' },
+    { label: 'value', text: 'value' },
+    { label: 'item', text: 'item' },
+    { label: 'index', text: 'index' },
+    { label: 'i', text: 'i' },
+    { label: 'j', text: 'j' },
+  ];
+
+  switch (currentLanguage?.key) {
+    case 'python':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '.append()', text: '.append()' },
+        { label: '.pop()', text: '.pop()' },
+        { label: '.get()', text: '.get()' },
+        { label: '.keys()', text: '.keys()' },
+        { label: '.values()', text: '.values()' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'cpp':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '.size()', text: '.size()' },
+        { label: '.push_back()', text: '.push_back()' },
+        { label: '.begin()', text: '.begin()' },
+        { label: '.end()', text: '.end()' },
+        { label: '->', text: '->' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'java':
+      return [
+        { label: '.length', text: '.length' },
+        { label: '.size()', text: '.size()' },
+        { label: '.add()', text: '.add()' },
+        { label: '.get()', text: '.get()' },
+        { label: '.put()', text: '.put()' },
+        { label: '.toString()', text: '.toString()' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'javascript':
+    case 'typescript':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '.length', text: '.length' },
+        { label: '.push()', text: '.push()' },
+        { label: '.pop()', text: '.pop()' },
+        { label: '.map()', text: '.map()' },
+        { label: '.filter()', text: '.filter()' },
+        { label: '.reduce()', text: '.reduce()' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'go':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: 'len()', text: 'len()' },
+        { label: 'append()', text: 'append()' },
+        { label: 'make()', text: 'make()' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'rust':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '.len()', text: '.len()' },
+        { label: '.push()', text: '.push()' },
+        { label: '.pop()', text: '.pop()' },
+        { label: '.get()', text: '.get()' },
+        { label: '.iter()', text: '.iter()' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'c':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '*', text: '*' },
+        { label: '&', text: '&' },
+        { label: '->', text: '->' },
+        { label: '.', text: '.' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'csharp':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '.Length', text: '.Length' },
+        { label: '.Count', text: '.Count' },
+        { label: '.Add()', text: '.Add()' },
+        { label: '.Remove()', text: '.Remove()' },
+        { label: '.ToString()', text: '.ToString()' },
+        ...commonNames,
+        ...common,
+      ];
+    case 'php':
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '->', text: '->' },
+        { label: 'count()', text: 'count()' },
+        { label: 'array_push()', text: 'array_push()' },
+        { label: 'array_pop()', text: 'array_pop()' },
+        ...commonNames,
+        ...common,
+      ];
+    default:
+      return [
+        { label: '[', text: '[' },
+        { label: ']', text: ']' },
+        { label: '.', text: '.' },
+        ...commonNames,
+        ...common,
+      ];
+  }
+}
+
+function getTypeQuickInsertButtons(currentLanguage?: LanguageDefinition) {
+  // Language-specific type shortcuts
+  switch (currentLanguage?.key) {
+    case 'cpp':
+      return [
+        { label: '*', text: '* ' },
+        { label: '&', text: '& ' },
+        { label: 'const', text: 'const ' },
+        { label: '<>', text: '<>' },
+        { label: '::', text: '::' },
+      ];
+    case 'java':
+      return [
+        { label: '<>', text: '<>' },
+        { label: '[]', text: '[]' },
+        { label: 'final', text: 'final ' },
+      ];
+    case 'typescript':
+      return [
+        { label: '<>', text: '<>' },
+        { label: '[]', text: '[]' },
+        { label: '|', text: ' | ' },
+        { label: '&', text: ' & ' },
+        { label: '?', text: '?' },
+      ];
+    case 'go':
+      return [
+        { label: '[]', text: '[]' },
+        { label: 'map[', text: 'map[' },
+        { label: ']', text: ']' },
+        { label: 'chan', text: 'chan ' },
+        { label: '*', text: '*' },
+      ];
+    case 'rust':
+      return [
+        { label: '<>', text: '<>' },
+        { label: '&', text: '&' },
+        { label: 'mut', text: 'mut ' },
+        { label: '::', text: '::' },
+      ];
+    case 'c':
+      return [
+        { label: '*', text: '* ' },
+        { label: 'unsigned', text: 'unsigned ' },
+        { label: 'const', text: 'const ' },
+        { label: 'struct', text: 'struct ' },
+      ];
+    default:
+      return [
+        { label: '<>', text: '<>' },
+        { label: '[]', text: '[]' },
+        { label: '*', text: '* ' },
+        { label: '&', text: '& ' },
+      ];
   }
 }
 

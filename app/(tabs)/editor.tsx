@@ -69,6 +69,7 @@ export default function EditorScreen() {
   const [historyIndex, setHistoryIndex] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [lastSavedContent, setLastSavedContent] = useState('');
+  const [suppressAutoScroll, setSuppressAutoScroll] = useState(false);
   const getExtension = (lang: string) => {
     const normalizedLang = lang === 'python3' ? 'python' : lang;
     const map: Record<string, string> = {
@@ -146,7 +147,10 @@ export default function EditorScreen() {
   const lineNumbersRef = useRef<ScrollView>(null);
   const codeScrollRef = useRef<ScrollView>(null);
   const horizontalScrollRef = useRef<ScrollView>(null);
+  // Keep content width from shrinking while editing to avoid horizontal jumps
+  const maxContentWidthRef = useRef(0);
   const [showSystemKeyboard, setShowSystemKeyboard] = useState(false);
+  const [hScrollX, setHScrollX] = useState(0);
   const [isEditing, setIsEditing] = useState(false);
   const focusFromInsert = useRef(false);
   const [textSelection, setTextSelection] = useState<{start: number, end: number}>({ start: cursorPosition, end: cursorPosition });
@@ -557,6 +561,8 @@ export default function EditorScreen() {
     };
   };
 
+  // Removed previous caret-visibility scroll correction to avoid fighting iOS animations
+
   const runCode = () => {
     // Dismiss keyboard first, then show terminal
     dismissKeyboard();
@@ -674,6 +680,10 @@ export default function EditorScreen() {
     maxLineLength * CHAR_WIDTH + 48,
     Dimensions.get('window').width - 50,
   );
+
+  // Stabilize width: never shrink during an edit session
+  const stableContentWidth = Math.max(contentWidth, maxContentWidthRef.current);
+  maxContentWidthRef.current = stableContentWidth;
   
   // Ensure minimum height for 20 lines to improve horizontal scrolling
   const minLines = 20;
@@ -781,8 +791,11 @@ export default function EditorScreen() {
                 automaticallyAdjustContentInsets={false}
                 automaticallyAdjustKeyboardInsets={false}
                 keyboardShouldPersistTaps="handled"
+                scrollEnabled={!suppressAutoScroll}
+                onScroll={(e) => setHScrollX(e.nativeEvent.contentOffset.x)}
+                scrollEventThrottle={16}
               >
-                <View style={[styles.codeContainer, { width: contentWidth + 50, minHeight: contentHeight }]}>
+                <View style={[styles.codeContainer, { width: stableContentWidth + 50, minHeight: contentHeight }]}>
                   {/* Line numbers column */}
                   <View style={styles.lineNumbersColumn}>
                     {Array.from({ length: displayLines }, (_, index) => (
@@ -799,12 +812,14 @@ export default function EditorScreen() {
                       language={currentLanguage.key} 
                       onTemplateClick={handleTemplateClick}
                     />
-                    <View
-                      style={[
-                        styles.cursor,
-                        { left: cursor.left, top: cursor.top },
-                      ]}
-                    />
+                    {!isEditing && (
+                      <View
+                        style={[
+                          styles.cursor,
+                          { left: cursor.left, top: cursor.top },
+                        ]}
+                      />
+                    )}
                     {/* Overlay to capture double-taps for editing */}
                     {!isEditing && (
                       <TouchableOpacity
@@ -819,49 +834,62 @@ export default function EditorScreen() {
                         }}
                       />
                     )}
-                    {/* TextInput only active when editing */}
-                    <TextInput
-                      ref={editorRef}
-                      style={[styles.codeInput, { width: contentWidth }]}
-                      value={code}
-                      selection={textSelection}
-                      onChangeText={handleTextChange}
-                      onSelectionChange={(event) => {
-                        const { start, end } = event.nativeEvent.selection;
-                        setTextSelection({ start, end });
-                        // Update cursor position to the end of selection (or just cursor if no selection)
-                        setCursorPosition(end);
-                      }}
-                      multiline
-                      textAlignVertical="top"
-                      selectionColor="#007AFF"
-                      placeholderTextColor="#8E8E93"
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      spellCheck={false}
-                      keyboardType="ascii-capable"
-                      blurOnSubmit={false}
-                      returnKeyType="default"
-                      showSoftInputOnFocus={isEditing}
-                      scrollEnabled={false}
-                      pointerEvents={isEditing ? 'auto' : 'none'}
-                      onFocus={() => {
-                        if (focusFromInsert.current) {
-                          setShowSystemKeyboard(false);
-                          Keyboard.dismiss();
-                        } else {
-                          setIsEditing(true);
-                          setShowSystemKeyboard(true);
-                        }
-                      }}
-                      onBlur={() => {
-                        setIsEditing(false);
-                        setShowSystemKeyboard(false);
-                      }}
-                    />
                   </View>
                 </View>
               </ScrollView>
+              {/* Invisible TextInput overlay inside the vertical scroller (but outside horizontal) */}
+              <TextInput
+                ref={editorRef}
+                style={[
+                  styles.codeInput,
+                  {
+                    width: stableContentWidth,
+                    transform: [{ translateX: 50 - hScrollX }],
+                    height: contentHeight,
+                  },
+                ]}
+                value={code}
+                selection={textSelection}
+                onChangeText={handleTextChange}
+                onKeyPress={(e) => {
+                  if (e.nativeEvent.key === 'Backspace') {
+                    setSuppressAutoScroll(true);
+                    setTimeout(() => setSuppressAutoScroll(false), 450);
+                  }
+                }}
+                onSelectionChange={(event) => {
+                  const { start, end } = event.nativeEvent.selection;
+                  setTextSelection({ start, end });
+                  // Update cursor position to the end of selection (or just cursor if no selection)
+                  setCursorPosition(end);
+                }}
+                multiline
+                textAlignVertical="top"
+                selectionColor="#007AFF"
+                placeholderTextColor="#8E8E93"
+                autoCapitalize="none"
+                autoCorrect={false}
+                spellCheck={false}
+                keyboardType="ascii-capable"
+                blurOnSubmit={false}
+                returnKeyType="default"
+                showSoftInputOnFocus={isEditing}
+                scrollEnabled={false}
+                pointerEvents={isEditing ? 'auto' : 'none'}
+                onFocus={() => {
+                  if (focusFromInsert.current) {
+                    setShowSystemKeyboard(false);
+                    Keyboard.dismiss();
+                  } else {
+                    setIsEditing(true);
+                    setShowSystemKeyboard(true);
+                  }
+                }}
+                onBlur={() => {
+                  setIsEditing(false);
+                  setShowSystemKeyboard(false);
+                }}
+              />
             </ScrollView>
 
             {/* Template Renamer Button */}
@@ -1040,8 +1068,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     left: 0,
-    right: 0,
-    bottom: 0,
     zIndex: 2,
   },
   cursor: {

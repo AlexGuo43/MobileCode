@@ -16,6 +16,9 @@
         "NSCameraUsageDescription": "Camera is not used. External api calls to a server providing LeetCode's daily challenge is used, with no concern of private user data."
       }
     },
+    "android": {
+      "package": "com.alexguo43.mobilecoder"
+    },
     "web": {
       "bundler": "metro",
       "output": "single",

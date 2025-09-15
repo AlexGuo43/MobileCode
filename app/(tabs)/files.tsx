@@ -5,11 +5,14 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   Alert,
+  Modal,
+  TextInput,
+  Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { File, Folder, Plus, MoveVertical as MoreVertical, CreditCard as Edit3, Trash2, Cloud, Edit, HelpCircle } from 'lucide-react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FS from '@/utils/fs';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { AuthButton } from '@/components/AuthButton';
 import { MobileCoderHelpModal } from '@/components/MobileCoderHelpModal';
@@ -26,7 +29,7 @@ interface FileItem {
   isSynced?: boolean;
 }
 
-const ROOT_DIR = FileSystem.documentDirectory + 'files/';
+const ROOT_DIR = FS.documentDirectory + 'files/';
 
 export default function FilesScreen() {
   const router = useRouter();
@@ -35,11 +38,15 @@ export default function FilesScreen() {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [showHelpModal, setShowHelpModal] = useState(false);
   const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [newFileName, setNewFileName] = useState('untitled.py');
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameValue, setRenameValue] = useState('');
 
   useEffect(() => {
     (async () => {
       try {
-        await FileSystem.makeDirectoryAsync(ROOT_DIR, { intermediates: true });
+        await FS.ensureDir(ROOT_DIR);
       } catch (e) {
         // directory probably exists
       }
@@ -99,10 +106,10 @@ export default function FilesScreen() {
 
   const loadLocalFiles = async () => {
     try {
-      const names = await FileSystem.readDirectoryAsync(ROOT_DIR);
+      const names = await FS.list(ROOT_DIR);
       const items: FileItem[] = [];
       for (const name of names) {
-        const info = await FileSystem.getInfoAsync(ROOT_DIR + name);
+        const info = await FS.stat(ROOT_DIR + name);
         if (info.exists) {
           items.push({
             id: info.uri,
@@ -198,73 +205,44 @@ export default function FilesScreen() {
     );
   };
 
-  const createFile = async () => {
-    Alert.prompt(
-      'Create New File',
-      'Enter a filename:',
-      async (filename: string) => {
-        if (!filename || !filename.trim()) {
-          return; // User cancelled or entered empty name
-        }
-        
-        let finalFilename = filename.trim();
-        
-        // Add .py extension if no extension provided
-        if (!finalFilename.includes('.')) {
-          finalFilename += '.py';
-        }
-        
+  const confirmCreateFile = async () => {
+    const filename = newFileName;
+    setShowCreateModal(false);
+    if (!filename || !filename.trim()) return;
+    let finalFilename = filename.trim();
+    if (!finalFilename.includes('.')) finalFilename += '.py';
+    try {
+      const path = `${ROOT_DIR}${finalFilename}`;
+      await FS.writeText(path, '# New file\n');
+      if (isAuthenticated) {
         try {
-          const path = `${ROOT_DIR}${finalFilename}`;
-          await FileSystem.writeAsStringAsync(path, '# New file\n');
-          
-          // If user is signed in, automatically sync the new file to cloud
-          if (isAuthenticated) {
-            try {
-              const success = await syncService.uploadFile(path, finalFilename);
-              if (success) {
-                console.log(`New file ${finalFilename} uploaded to cloud`);
-                // Refresh storage info after successful upload
-                await loadStorageInfo();
-              }
-            } catch (syncError) {
-              console.warn('Failed to sync new file to cloud:', syncError);
-              if (syncError instanceof Error && syncError.message.includes('Storage Limit Exceeded')) {
-                Alert.alert(
-                  'Storage Limit Exceeded',
-                  'Your file was created locally but could not be synced to the cloud due to storage limits. Please free up space or upgrade your plan.',
-                  [{ text: 'OK' }]
-                );
-              }
-              // Don't block the user - file is still created locally
-            }
+          const success = await syncService.uploadFile(path, finalFilename);
+          if (success) await loadStorageInfo();
+        } catch (syncError) {
+          console.warn('Failed to sync new file to cloud:', syncError);
+          if (syncError instanceof Error && syncError.message.includes('Storage Limit Exceeded')) {
+            Alert.alert('Storage Limit Exceeded', 'Your file was created locally but could not be synced to the cloud due to storage limits.');
           }
-          
-          // Refresh the files list to show the new file
-          loadFiles();
-          
-          // Navigate to editor with the new file
-          router.push({
-            pathname: '/(tabs)/editor',
-            params: { 
-              fileUri: path,
-              cloudFileName: finalFilename 
-            },
-          });
-        } catch (e) {
-          console.error('Failed to create file', e);
-          Alert.alert('Error', 'Failed to create file. Please try again.');
         }
-      },
-      'plain-text',
-      'untitled.py' // Default filename
-    );
+      }
+      await loadFiles();
+      router.push({ pathname: '/(tabs)/editor', params: { fileUri: path, cloudFileName: finalFilename } });
+    } catch (e) {
+      console.error('Failed to create file', e);
+      Alert.alert('Error', 'Failed to create file. Please try again.');
+    }
+  };
+
+  const createFile = () => {
+    setNewFileName('untitled.py');
+    // Delay opening to allow Alert to close on Android
+    setTimeout(() => setShowCreateModal(true), 0);
   };
 
   const createFolder = async () => {
     try {
       const path = `${ROOT_DIR}new_folder_${Date.now()}`;
-      await FileSystem.makeDirectoryAsync(path);
+      await FS.ensureDir(path);
       loadFiles();
     } catch (e) {
       console.error('Failed to create folder', e);
@@ -295,7 +273,7 @@ export default function FilesScreen() {
               
               // Delete local file
               const localPath = fileToDelete.isSynced ? ROOT_DIR + fileToDelete.name : fileToDelete.id;
-              await FileSystem.deleteAsync(localPath, { idempotent: true });
+              await FS.remove(localPath, { idempotent: true });
               
               setSelectedFile(null);
               loadFiles();
@@ -311,74 +289,52 @@ export default function FilesScreen() {
 
   const renameSelected = async () => {
     if (!selectedFile) return;
-    
-    // Find the selected file to get its current name
     const fileToRename = files.find(f => f.id === selectedFile);
     if (!fileToRename) return;
-    
-    Alert.prompt(
-      'Rename File', 
-      'Enter a new name:', 
-      async (newName: string) => {
-        if (!newName || !newName.trim()) return;
-        
-        let finalName = newName.trim();
-        
-        // Add extension if not provided
-        if (!finalName.includes('.')) {
-          const currentExt = fileToRename.extension;
-          if (currentExt) {
-            finalName += `.${currentExt}`;
+    setRenameValue(fileToRename.name);
+    setShowRenameModal(true);
+  };
+
+  const confirmRename = async () => {
+    setShowRenameModal(false);
+    if (!selectedFile) return;
+    const fileToRename = files.find(f => f.id === selectedFile);
+    if (!fileToRename) return;
+    const newName = renameValue;
+    if (!newName || !newName.trim()) return;
+    let finalName = newName.trim();
+    if (!finalName.includes('.')) {
+      const currentExt = fileToRename.extension;
+      if (currentExt) finalName += `.${currentExt}`;
+    }
+    try {
+      if (fileToRename.isSynced && isAuthenticated) {
+        const cloudFiles = await syncService.getRemoteFiles();
+        const currentFile = cloudFiles.find(f => f.filename === fileToRename.name);
+        if (currentFile) {
+          const tempPath = FS.cacheDirectory + finalName;
+          await FS.writeText(tempPath, currentFile.content);
+          const uploadSuccess = await syncService.uploadFile(tempPath, finalName);
+          if (uploadSuccess) {
+            await syncService.deleteFile(fileToRename.name);
+            await FS.remove(tempPath, { idempotent: true });
           }
         }
-        
-        try {
-          if (fileToRename.isSynced && isAuthenticated) {
-            // Handle cloud file rename
-            const cloudFiles = await syncService.getRemoteFiles();
-            const currentFile = cloudFiles.find(f => f.filename === fileToRename.name);
-            
-            if (currentFile) {
-              // Create temp file with new name and upload
-              const tempPath = FileSystem.cacheDirectory + finalName;
-              await FileSystem.writeAsStringAsync(tempPath, currentFile.content);
-              
-              // Upload with new name
-              const uploadSuccess = await syncService.uploadFile(tempPath, finalName);
-              
-              if (uploadSuccess) {
-                // Delete old file from cloud
-                await syncService.deleteFile(fileToRename.name);
-                
-                // Clean up temp file
-                await FileSystem.deleteAsync(tempPath, { idempotent: true });
-              }
-            }
-            
-            // Rename local copy
-            const oldLocalPath = ROOT_DIR + fileToRename.name;
-            const newLocalPath = ROOT_DIR + finalName;
-            const localFileInfo = await FileSystem.getInfoAsync(oldLocalPath);
-            if (localFileInfo.exists) {
-              await FileSystem.moveAsync({ from: oldLocalPath, to: newLocalPath });
-            }
-          } else {
-            // Handle local file rename
-            const oldLocalPath = fileToRename.id; // This is the full path for local files
-            const newLocalPath = ROOT_DIR + finalName;
-            await FileSystem.moveAsync({ from: oldLocalPath, to: newLocalPath });
-          }
-          
-          setSelectedFile(null);
-          loadFiles();
-        } catch (e) {
-          console.error('Failed to rename', e);
-          Alert.alert('Error', 'Failed to rename file. Please try again.');
-        }
-      },
-      'plain-text',
-      fileToRename.name // Default to current name
-    );
+        const oldLocalPath = ROOT_DIR + fileToRename.name;
+        const newLocalPath = ROOT_DIR + finalName;
+        const localFileInfo = await FS.stat(oldLocalPath);
+        if (localFileInfo.exists) await FS.move(oldLocalPath, newLocalPath);
+      } else {
+        const oldLocalPath = fileToRename.id;
+        const newLocalPath = ROOT_DIR + finalName;
+        await FS.move(oldLocalPath, newLocalPath);
+      }
+      setSelectedFile(null);
+      loadFiles();
+    } catch (e) {
+      console.error('Failed to rename', e);
+      Alert.alert('Error', 'Failed to rename file. Please try again.');
+    }
   };
 
   const renderFileItem = ({ item }: { item: FileItem }) => (
@@ -413,7 +369,7 @@ export default function FilesScreen() {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
@@ -488,6 +444,58 @@ export default function FilesScreen() {
         visible={showHelpModal}
         onClose={() => setShowHelpModal(false)}
       />
+
+      {/* Create File Modal */}
+      <Modal visible={showCreateModal} transparent animationType="fade" onRequestClose={() => setShowCreateModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Create New File</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter filename"
+              placeholderTextColor="#8E8E93"
+              value={newFileName}
+              onChangeText={setNewFileName}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.modalButton, styles.modalCancel]} onPress={() => setShowCreateModal(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalConfirm]} onPress={confirmCreateFile}>
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Create</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Rename File Modal */}
+      <Modal visible={showRenameModal} transparent animationType="fade" onRequestClose={() => setShowRenameModal(false)}>
+        <View style={styles.modalBackdrop}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Rename File</Text>
+            <TextInput
+              style={styles.modalInput}
+              placeholder="Enter new name"
+              placeholderTextColor="#8E8E93"
+              value={renameValue}
+              onChangeText={setRenameValue}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <View style={styles.modalActions}>
+              <TouchableOpacity style={[styles.modalButton, styles.modalCancel]} onPress={() => setShowRenameModal(false)}>
+                <Text style={styles.modalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={[styles.modalButton, styles.modalConfirm]} onPress={confirmRename}>
+                <Text style={[styles.modalButtonText, { color: '#FFFFFF' }]}>Rename</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -628,6 +636,55 @@ const styles = StyleSheet.create({
   },
   actionText: {
     color: '#007AFF',
+    fontSize: 14,
+    fontFamily: 'FiraCode-Regular',
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCard: {
+    width: '85%',
+    backgroundColor: '#2C2C2E',
+    borderRadius: 12,
+    padding: 16,
+  },
+  modalTitle: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontFamily: 'FiraCode-Medium',
+    marginBottom: 12,
+  },
+  modalInput: {
+    backgroundColor: '#1C1C1E',
+    color: '#FFFFFF',
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
+    borderWidth: 1,
+    borderColor: '#3C3C3E',
+  },
+  modalActions: {
+    marginTop: 12,
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  modalButton: {
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 8,
+  },
+  modalCancel: {
+    backgroundColor: '#3C3C3E',
+  },
+  modalConfirm: {
+    backgroundColor: '#007AFF',
+  },
+  modalButtonText: {
+    color: '#FFFFFF',
     fontSize: 14,
     fontFamily: 'FiraCode-Regular',
   },

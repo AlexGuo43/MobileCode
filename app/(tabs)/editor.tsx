@@ -7,13 +7,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   Dimensions,
-  SafeAreaView,
+  Platform,
   Keyboard,
   TouchableWithoutFeedback,
   Linking,
   Alert,
   Share,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -22,7 +23,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { GestureDetector, Gesture } from 'react-native-gesture-handler';
 import { useLocalSearchParams } from 'expo-router';
-import * as FileSystem from 'expo-file-system';
+import * as FS from '@/utils/fs';
 import {
   Play,
   Save,
@@ -45,7 +46,7 @@ import { useLanguage } from '@/contexts/LanguageContext';
 
 const { height: screenHeight } = Dimensions.get('window');
 const LINE_HEIGHT = 20;
-const CHAR_WIDTH = 8.4;
+const DEFAULT_CHAR_WIDTH = 8.4;
 const INITIAL_CODE = `# Welcome to Mobile Code Editor\n`;
 
 export default function EditorScreen() {
@@ -65,6 +66,8 @@ export default function EditorScreen() {
   const [showTemplateRenamer, setShowTemplateRenamer] = useState(false);
   const [activeTemplate, setActiveTemplate] = useState<TemplateMatch | null>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const [charWidth, setCharWidth] = useState(DEFAULT_CHAR_WIDTH);
+  const [cursorCoords, setCursorCoords] = useState<{ left: number; top: number }>({ left: 16, top: 16 });
   const [history, setHistory] = useState([{ code: INITIAL_CODE, cursor: 0 }]);
   const [historyIndex, setHistoryIndex] = useState(0);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -100,13 +103,13 @@ export default function EditorScreen() {
     
     try {
       // Create a temp file path for uploading
-      const tempPath = FileSystem.cacheDirectory + filename;
-      await FileSystem.writeAsStringAsync(tempPath, content);
+      const tempPath = FS.cacheDirectory + filename;
+      await FS.writeText(tempPath, content);
       
       const success = await syncService.uploadFile(tempPath, filename);
       
       // Clean up temp file
-      await FileSystem.deleteAsync(tempPath, { idempotent: true });
+      await FS.remove(tempPath, { idempotent: true });
       
       if (success) {
         console.log('Auto-saved to cloud:', filename);
@@ -256,7 +259,7 @@ export default function EditorScreen() {
     async function loadLocalFile() {
       if (!fileUri) return;
         try {
-          const content = await FileSystem.readAsStringAsync(fileUri as string);
+          const content = await FS.readText(fileUri as string);
           setCode(content);
           setOriginalContent(content);
           setIsModified(false);
@@ -310,7 +313,7 @@ export default function EditorScreen() {
       if (code !== lastSavedContent && fileUri && activeFile !== 'untitled.py') {
         try {
           // Save locally
-          await FileSystem.writeAsStringAsync(fileUri as string, code);
+          await FS.writeText(fileUri as string, code);
           setLastSavedContent(code);
           setOriginalContent(code);
           setIsModified(false);
@@ -383,9 +386,11 @@ export default function EditorScreen() {
     transform: [{ translateY: terminalOffset.value }],
   }));
 
-  const insertCode = (text: string) => {
-    setShowSystemKeyboard(false);
-    Keyboard.dismiss();
+  const insertCode = (text: string, options?: { fromKeyboard?: boolean }) => {
+    if (!options?.fromKeyboard) {
+      setShowSystemKeyboard(false);
+      Keyboard.dismiss();
+    }
     let insertText = text;
 
     if (text === '\n') {
@@ -422,19 +427,25 @@ export default function EditorScreen() {
     
     setCode(newCode);
     updateHistory(newCode, newCursorPosition);
-    // Check if content has been modified
     setIsModified(newCode !== originalContent);
+    setTextSelection({ start: newCursorPosition, end: newCursorPosition });
+    setCursorPosition(newCursorPosition);
 
-    // Use the moveCursor function to ensure proper caret tracking
-    setTimeout(() => {
-      if (editorRef.current) {
-        focusFromInsert.current = true;
-        editorRef.current.focus();
-        Keyboard.dismiss();
-        moveCursor(newCursorPosition);
-        focusFromInsert.current = false;
-      }
-    }, 100);
+    if (options?.fromKeyboard) {
+      if (!isEditing) setIsEditing(true);
+      setTimeout(() => {
+        if (editorRef.current) {
+          focusFromInsert.current = true;
+          editorRef.current.focus();
+          setShowSystemKeyboard(true);
+          moveCursor(newCursorPosition);
+          focusFromInsert.current = false;
+        }
+      }, 0);
+    } else {
+      // Keep system keyboard hidden after snippet inserts
+      if (isEditing) setIsEditing(false);
+    }
   };
 
   const deindentLine = () => {
@@ -532,21 +543,31 @@ export default function EditorScreen() {
   };
 
   const handleTextChange = (text: string) => {
-    const before = code.substring(0, cursorPosition);
-    const after = code.substring(cursorPosition);
-    if (
-      text.length === code.length + 1 &&
-      text.startsWith(before) &&
-      text.endsWith(after) &&
-      text[cursorPosition] === '\n'
-    ) {
-      insertCode('\n');
-    } else {
-      setCode(text);
-      updateHistory(text, cursorPosition + (text.length - code.length));
-      // Check if content has been modified
-      setIsModified(text !== originalContent);
+    // Compute diff to determine insertion point and inserted text
+    let i = 0;
+    while (i < code.length && i < text.length && code[i] === text[i]) i++;
+    let j = 0;
+    while (
+      j < code.length - i &&
+      j < text.length - i &&
+      code[code.length - 1 - j] === text[text.length - 1 - j]
+    ) j++;
+
+    const removed = code.slice(i, code.length - j);
+    const added = text.slice(i, text.length - j);
+
+    // If Enter inserted, apply auto-indent
+    if (added === "\n") {
+      insertCode("\n", { fromKeyboard: true });
+      return;
     }
+
+    // Generic update: set code and move cursor to end of inserted segment
+    setCode(text);
+    const newCursor = i + added.length;
+    updateHistory(text, newCursor);
+    setIsModified(text !== originalContent);
+    moveCursor(newCursor);
   };
 
 
@@ -557,7 +578,7 @@ export default function EditorScreen() {
     const col = lines[lines.length - 1].length;
     return {
       top: 16 + row * LINE_HEIGHT,
-      left: 16 + col * CHAR_WIDTH,
+      left: 16 + col * charWidth,
     };
   };
 
@@ -587,7 +608,7 @@ export default function EditorScreen() {
     try {
       if (fileUri) {
         // Save to existing file
-        await FileSystem.writeAsStringAsync(fileUri as string, code);
+        await FS.writeText(fileUri as string, code);
         setOriginalContent(code);
         setIsModified(false);
         setLastSavedContent(code);
@@ -604,11 +625,11 @@ export default function EditorScreen() {
           const autoFilename = `lc-${slug}.${extension}`;
           
           try {
-            const ROOT_DIR = FileSystem.documentDirectory + 'files/';
-            await FileSystem.makeDirectoryAsync(ROOT_DIR, { intermediates: true });
+            const ROOT_DIR = FS.documentDirectory + 'files/';
+            await FS.ensureDir(ROOT_DIR);
             const newPath = ROOT_DIR + autoFilename;
             
-            await FileSystem.writeAsStringAsync(newPath, code);
+            await FS.writeText(newPath, code);
             setOriginalContent(code);
             setIsModified(false);
             setActiveFile(autoFilename);
@@ -625,45 +646,58 @@ export default function EditorScreen() {
         } else {
           // Prompt for filename for regular files
           const defaultName = `untitled.${extension}`;
-          
-          Alert.prompt(
-            'Save File',
-            'Enter a filename:',
-            async (filename: string) => {
-              if (!filename || !filename.trim()) {
-                return; // User cancelled or entered empty name
+          if (Platform.OS === 'android') {
+            // Android: Alert.prompt is not supported; use default name
+            try {
+              const ROOT_DIR = FS.documentDirectory + 'files/';
+              await FS.ensureDir(ROOT_DIR);
+              const newPath = ROOT_DIR + defaultName;
+              await FS.writeText(newPath, code);
+              setOriginalContent(code);
+              setIsModified(false);
+              setActiveFile(defaultName);
+              setLastSavedContent(code);
+              if (isAuthenticated) {
+                await autoSaveToCloud(defaultName, code);
               }
-              
-              let finalFilename = filename.trim();
-              
-              // Add extension if not provided
-              if (!finalFilename.includes('.')) {
-                finalFilename += `.${extension}`;
-              }
-              
-              try {
-                const ROOT_DIR = FileSystem.documentDirectory + 'files/';
-                await FileSystem.makeDirectoryAsync(ROOT_DIR, { intermediates: true });
-                const newPath = ROOT_DIR + finalFilename;
-                
-                await FileSystem.writeAsStringAsync(newPath, code);
-                setOriginalContent(code);
-                setIsModified(false);
-                setActiveFile(finalFilename);
-                setLastSavedContent(code);
-                
-                // Auto-save to cloud if authenticated
-                if (isAuthenticated) {
-                  await autoSaveToCloud(finalFilename, code);
+              Alert.alert('Saved', `Saved as ${defaultName}`);
+            } catch (e) {
+              console.error('Failed to save file', e);
+              Alert.alert('Error', 'Failed to save file. Please try again.');
+            }
+          } else {
+            Alert.prompt(
+              'Save File',
+              'Enter a filename:',
+              async (filename: string) => {
+                if (!filename || !filename.trim()) {
+                  return; // User cancelled or entered empty name
                 }
-              } catch (e) {
-                console.error('Failed to save file', e);
-                Alert.alert('Error', 'Failed to save file. Please try again.');
-              }
-            },
-            'plain-text',
-            defaultName
-          );
+                let finalFilename = filename.trim();
+                if (!finalFilename.includes('.')) {
+                  finalFilename += `.${extension}`;
+                }
+                try {
+                  const ROOT_DIR = FS.documentDirectory + 'files/';
+                  await FS.ensureDir(ROOT_DIR);
+                  const newPath = ROOT_DIR + finalFilename;
+                  await FS.writeText(newPath, code);
+                  setOriginalContent(code);
+                  setIsModified(false);
+                  setActiveFile(finalFilename);
+                  setLastSavedContent(code);
+                  if (isAuthenticated) {
+                    await autoSaveToCloud(finalFilename, code);
+                  }
+                } catch (e) {
+                  console.error('Failed to save file', e);
+                  Alert.alert('Error', 'Failed to save file. Please try again.');
+                }
+              },
+              'plain-text',
+              defaultName
+            );
+          }
         }
       }
     } catch (e) {
@@ -672,12 +706,12 @@ export default function EditorScreen() {
     }
   };
 
-  const cursor = getCursorCoords();
+  const cursor = cursorCoords;
   const maxLineLength = Math.max(
     ...code.split('\n').map((line) => line.length),
   );
   const contentWidth = Math.max(
-    maxLineLength * CHAR_WIDTH + 48,
+    maxLineLength * charWidth + 48,
     Dimensions.get('window').width - 50,
   );
 
@@ -697,7 +731,33 @@ export default function EditorScreen() {
     : code;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Measure character width for accurate cursor positioning on Android */}
+      <Text
+        style={{ position: 'absolute', opacity: 0, fontFamily: 'FiraCode-Regular', fontSize: 14, lineHeight: LINE_HEIGHT }}
+        allowFontScaling={false}
+        onLayout={(e) => {
+          const width = e.nativeEvent.layout.width;
+          // We render 100 chars below; divide to get per-char width
+          if (width > 0) setCharWidth(width / 100);
+        }}
+      >
+        {/* 100 monospace characters for better precision */}
+        MMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMMM
+      </Text>
+      {/* Measure cursor position using native text layout to avoid char-width drift on Android */}
+      <Text
+        style={{ position: 'absolute', opacity: 0, fontFamily: 'FiraCode-Regular', fontSize: 14, lineHeight: LINE_HEIGHT }}
+        allowFontScaling={false}
+        onTextLayout={(e) => {
+          const lines = e.nativeEvent.lines || [];
+          const row = Math.max(0, lines.length - 1);
+          const width = lines[row]?.width ?? 0;
+          setCursorCoords({ left: 16 + width, top: 16 + row * LINE_HEIGHT });
+        }}
+      >
+        {code.substring(0, cursorPosition) || ' '}
+      </Text>
       <TouchableWithoutFeedback onPress={dismissKeyboard}>
         <GestureDetector gesture={twoFingerGesture}>
           <View style={styles.editorContainer}>
@@ -812,7 +872,7 @@ export default function EditorScreen() {
                       language={currentLanguage.key} 
                       onTemplateClick={handleTemplateClick}
                     />
-                    {!isEditing && (
+                    {(Platform.OS === 'android' || !isEditing) && (
                       <View
                         style={[
                           styles.cursor,
@@ -822,9 +882,7 @@ export default function EditorScreen() {
                     )}
                     {/* Overlay to capture double-taps for editing */}
                     {!isEditing && (
-                      <TouchableOpacity
-                        style={styles.editOverlay}
-                        activeOpacity={1}
+                      <TouchableWithoutFeedback
                         onPress={() => {
                           setIsEditing(true);
                           setTimeout(() => {
@@ -832,64 +890,74 @@ export default function EditorScreen() {
                             setShowSystemKeyboard(true);
                           }, 100);
                         }}
-                      />
+                      >
+                        <View style={styles.editOverlay} pointerEvents="box-only" />
+                      </TouchableWithoutFeedback>
                     )}
                   </View>
                 </View>
               </ScrollView>
-              {/* Invisible TextInput overlay inside the vertical scroller (but outside horizontal) */}
-              <TextInput
-                ref={editorRef}
-                style={[
-                  styles.codeInput,
-                  {
-                    width: stableContentWidth,
-                    transform: [{ translateX: 50 - hScrollX }],
-                    height: contentHeight,
-                  },
-                ]}
-                value={code}
-                selection={textSelection}
-                onChangeText={handleTextChange}
-                onKeyPress={(e) => {
-                  if (e.nativeEvent.key === 'Backspace') {
-                    setSuppressAutoScroll(true);
-                    setTimeout(() => setSuppressAutoScroll(false), 450);
-                  }
-                }}
-                onSelectionChange={(event) => {
-                  const { start, end } = event.nativeEvent.selection;
-                  setTextSelection({ start, end });
-                  // Update cursor position to the end of selection (or just cursor if no selection)
-                  setCursorPosition(end);
-                }}
-                multiline
-                textAlignVertical="top"
-                selectionColor="#007AFF"
-                placeholderTextColor="#8E8E93"
-                autoCapitalize="none"
-                autoCorrect={false}
-                spellCheck={false}
-                keyboardType="ascii-capable"
-                blurOnSubmit={false}
-                returnKeyType="default"
-                showSoftInputOnFocus={isEditing}
-                scrollEnabled={false}
-                pointerEvents={isEditing ? 'auto' : 'none'}
-                onFocus={() => {
-                  if (focusFromInsert.current) {
+              {/* TextInput overlay only when editing (prevents Android dark overlay artifacts) */}
+              {isEditing && (
+                <TextInput
+                  ref={editorRef}
+                  style={[
+                    styles.codeInput,
+                    {
+                      width: stableContentWidth,
+                      transform: [{ translateX: 50 - hScrollX }],
+                      height: contentHeight,
+                      opacity: Platform.OS === 'android' ? 0.01 : 1,
+                    },
+                  ]}
+                  value={code}
+                  selection={textSelection}
+                  onChangeText={handleTextChange}
+                  onKeyPress={(e) => {
+                    if (e.nativeEvent.key === 'Backspace') {
+                      setSuppressAutoScroll(true);
+                      setTimeout(() => setSuppressAutoScroll(false), 450);
+                    }
+                  }}
+                  onSelectionChange={(event) => {
+                    const { start, end } = event.nativeEvent.selection;
+                    setTextSelection({ start, end });
+                    setCursorPosition(end);
+                  }}
+                  multiline
+                  textAlignVertical="top"
+                  selectionColor={Platform.OS === 'android' ? 'transparent' : '#007AFF'}
+                  placeholderTextColor="#8E8E93"
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  spellCheck={false}
+                  keyboardType="ascii-capable"
+                  allowFontScaling={false}
+                  blurOnSubmit={false}
+                  returnKeyType="default"
+                  showSoftInputOnFocus={isEditing}
+                  scrollEnabled={false}
+                  pointerEvents="auto"
+                  underlineColorAndroid="transparent"
+                  caretHidden={Platform.OS === 'android'}
+                  importantForAutofill="no"
+                  autoComplete="off"
+                  disableFullscreenUI
+                  onFocus={() => {
+                    if (focusFromInsert.current) {
+                      setShowSystemKeyboard(false);
+                      Keyboard.dismiss();
+                    } else {
+                      setIsEditing(true);
+                      setShowSystemKeyboard(true);
+                    }
+                  }}
+                  onBlur={() => {
+                    setIsEditing(false);
                     setShowSystemKeyboard(false);
-                    Keyboard.dismiss();
-                  } else {
-                    setIsEditing(true);
-                    setShowSystemKeyboard(true);
-                  }
-                }}
-                onBlur={() => {
-                  setIsEditing(false);
-                  setShowSystemKeyboard(false);
-                }}
-              />
+                  }}
+                />
+              )}
             </ScrollView>
 
             {/* Template Renamer Button */}

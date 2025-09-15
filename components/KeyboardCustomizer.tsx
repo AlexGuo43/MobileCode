@@ -12,8 +12,8 @@ import {
   TouchableWithoutFeedback,
   KeyboardAvoidingView,
   Platform,
-  SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { X, Plus, Edit3, Trash2, Save } from 'lucide-react-native';
 import { storage } from '../utils/storage';
 
@@ -215,7 +215,7 @@ export function KeyboardCustomizer({ isVisible, onClose, onSave, initialTabs }: 
       supportedOrientations={['portrait']}
     >
       <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-        <SafeAreaView style={styles.container}>
+        <SafeAreaView style={styles.container} edges={['top']}>
           <KeyboardAvoidingView 
             style={styles.flex1} 
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

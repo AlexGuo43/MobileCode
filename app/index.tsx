@@ -6,7 +6,7 @@ export default function Index() {
   const router = useRouter();
 
   useEffect(() => {
-    router.replace('/editor');
+    router.replace('/(tabs)/editor');
   }, []);
 
   return <View />; // Empty view during redirect

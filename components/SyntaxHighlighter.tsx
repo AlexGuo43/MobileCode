@@ -75,7 +75,7 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
       }
       
       return (
-        <Text key={lineIndex} style={styles.line}>
+        <Text key={lineIndex} style={styles.line} allowFontScaling={false}>
           {tokens.map((token, tokenIndex) => {
             // Calculate position of this token in the full text
             let position = 0;
@@ -100,6 +100,7 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
                     styles[token.type as keyof typeof styles],
                     styles.template
                   ]}
+                  allowFontScaling={false}
                 >
                   {token.text}
                 </Text>
@@ -110,6 +111,7 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
               <Text
                 key={tokenIndex}
                 style={[styles.token, styles[token.type as keyof typeof styles]]}
+                allowFontScaling={false}
               >
                 {token.text}
               </Text>
@@ -123,7 +125,7 @@ export function SyntaxHighlighter({ code, language, onTemplateClick }: SyntaxHig
 
   return (
     <View style={styles.container}>
-      <Text style={styles.code}>
+      <Text style={styles.code} allowFontScaling={false}>
         {highlightCode(code, language)}
       </Text>
     </View>

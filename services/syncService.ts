@@ -1,4 +1,4 @@
-import * as FileSystem from 'expo-file-system';
+import * as FS from '@/utils/fs';
 import { authService } from './authService';
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL || 'https://backend-production-a87d.up.railway.app/api';
@@ -65,8 +65,8 @@ class SyncService {
         return false;
       }
 
-      const content = await FileSystem.readAsStringAsync(localFilePath);
-      const fileStats = await FileSystem.getInfoAsync(localFilePath);
+      const content = await FS.readText(localFilePath);
+      const fileStats = await FS.stat(localFilePath);
       const fileType = this.getFileTypeFromFilename(filename);
 
       const headers = await this.getAuthHeaders();
@@ -126,12 +126,12 @@ class SyncService {
 
       // Ensure directory exists
       const directory = localFilePath.substring(0, localFilePath.lastIndexOf('/'));
-      const dirInfo = await FileSystem.getInfoAsync(directory);
+      const dirInfo = await FS.stat(directory);
       if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(directory, { intermediates: true });
+        await FS.ensureDir(directory);
       }
 
-      await FileSystem.writeAsStringAsync(localFilePath, file.content);
+      await FS.writeText(localFilePath, file.content);
       
       return true;
     } catch (error) {
@@ -150,27 +150,27 @@ class SyncService {
         console.warn('Cannot sync files: User not authenticated');
         return results;
       }
-      const ROOT_DIR = FileSystem.documentDirectory + 'files/';
+      const ROOT_DIR = FS.documentDirectory + 'files/';
       
       // Ensure directory exists
-      const dirInfo = await FileSystem.getInfoAsync(ROOT_DIR);
+      const dirInfo = await FS.stat(ROOT_DIR);
       if (!dirInfo.exists) {
-        await FileSystem.makeDirectoryAsync(ROOT_DIR, { intermediates: true });
+        await FS.ensureDir(ROOT_DIR);
       }
 
       // Get all local files
       const localFiles: Array<{ filename: string; content: string; file_type: string; last_modified: string }> = [];
       
       try {
-        const fileNames = await FileSystem.readDirectoryAsync(ROOT_DIR);
+        const fileNames = await FS.list(ROOT_DIR);
         
         for (const fileName of fileNames) {
           const filePath = ROOT_DIR + fileName;
-          const fileInfo = await FileSystem.getInfoAsync(filePath);
+          const fileInfo = await FS.stat(filePath);
           
           if (!fileInfo.isDirectory && this.shouldSyncFile(fileName)) {
             try {
-              const content = await FileSystem.readAsStringAsync(filePath);
+              const content = await FS.readText(filePath);
               const fileType = this.getFileTypeFromFilename(fileName);
               const lastModified = new Date(fileInfo.modificationTime! * 1000).toISOString();
               
@@ -225,7 +225,7 @@ class SyncService {
       for (const serverFile of syncResponse.files) {
         try {
           const localPath = ROOT_DIR + serverFile.filename;
-          await FileSystem.writeAsStringAsync(localPath, serverFile.content);
+          await FS.writeText(localPath, serverFile.content);
           results.success++;
         } catch (error) {
           console.error(`Failed to write file ${serverFile.filename}:`, error);

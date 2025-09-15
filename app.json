@@ -7,7 +7,6 @@
     "icon": "./assets/images/icon.png",
     "scheme": "mobilecoder",
     "userInterfaceStyle": "automatic",
-    "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.alexguo43.mobilecoder",

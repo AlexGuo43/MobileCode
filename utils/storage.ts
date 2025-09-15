@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FS from '@/utils/fs';
 
 interface Storage {
   getItem: (key: string) => Promise<string | null>;
@@ -10,7 +10,7 @@ interface Storage {
 // File-based storage implementation that persists to device storage
 class FileStorage implements Storage {
   private getFilePath(key: string): string {
-    return `${FileSystem.documentDirectory}${key}.json`;
+    return `${FS.documentDirectory}${key}.json`;
   }
 
   async getItem(key: string): Promise<string | null> {
@@ -32,14 +32,14 @@ class FileStorage implements Storage {
     // For mobile, use file system
     try {
       const filePath = this.getFilePath(key);
-      const fileExists = await FileSystem.getInfoAsync(filePath);
+      const fileExists = await FS.stat(filePath);
       
       if (!fileExists.exists) {
         console.log('File does not exist:', filePath);
         return null;
       }
       
-      const value = await FileSystem.readAsStringAsync(filePath);
+      const value = await FS.readText(filePath);
       console.log('File storage getValue:', value);
       return value;
     } catch (error) {
@@ -68,7 +68,7 @@ class FileStorage implements Storage {
     // For mobile, use file system
     try {
       const filePath = this.getFilePath(key);
-      await FileSystem.writeAsStringAsync(filePath, value);
+      await FS.writeText(filePath, value);
       console.log('Saved to file storage:', filePath);
     } catch (error) {
       console.warn('Error writing to file storage:', error);
@@ -96,10 +96,10 @@ class FileStorage implements Storage {
     // For mobile, use file system
     try {
       const filePath = this.getFilePath(key);
-      const fileExists = await FileSystem.getInfoAsync(filePath);
+      const fileExists = await FS.stat(filePath);
       
       if (fileExists.exists) {
-        await FileSystem.deleteAsync(filePath);
+        await FS.remove(filePath);
         console.log('Removed from file storage:', filePath);
       }
     } catch (error) {

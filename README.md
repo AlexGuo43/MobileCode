@@ -2,7 +2,7 @@
 
 [![Download on the App Store](https://developer.apple.com/app-store/marketing/guidelines/images/badge-download-on-the-app-store.svg)](https://apps.apple.com/ca/app/mobilecoder-code-on-the-go/id6748107337)
 
-A mobile code editor built with React Native and Expo that provides a customizable coding experience on mobile devices.
+Leetcode on the go with this app! Don't use the iOS system keyboard ever again.
 
 ## Features
 
@@ -12,7 +12,6 @@ A mobile code editor built with React Native and Expo that provides a customizab
 - **Daily Challenges**: Integration with LeetCode's daily challenges
 - **File Management**: Built-in file system for managing code files
 - **Terminal Panel**: Terminal interface for command execution
-- **Cross-Platform**: Runs on iOS, Android, and web
 
 ## Getting Started
 
@@ -30,6 +29,8 @@ npm install
 
 # Start the development server
 npm run dev
+
+# Can run on an iOS device by downloading the Expo Go app, and scanning the QR code
 ```
 
 ## Project Structure
@@ -55,29 +56,6 @@ utils/
 ├── storage.ts         # Local storage utilities
 └── templateSystem.ts  # Template management system
 ```
-
-## Key Components
-
-### CodeKeyboard
-
-Provides a customizable keyboard with code snippets, smart predictions, and quick actions for mobile coding.
-
-### TemplateRenamer
-
-Allows easy renaming of template variables and function names throughout the codebase.
-
-### SyntaxHighlighter
-
-Renders code with syntax highlighting for better readability.
-
-## Configuration
-
-The app uses Expo configuration in `app.json` and supports:
-
-- iOS and Android deployment
-- Web deployment
-- Custom keyboard layouts
-- Template system customization
 
 ## License
 
